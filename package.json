@@ -107,7 +107,7 @@
   },
   "scripts": {
     "build-js": "npx esbuild src/extension.js --bundle --outfile=dist/extension.js --platform=node --external:vscode --format=cjs",
-    "copy-assets": "npx copyfiles -u 1 \"src/ui/assets/**/*\" dist",
+    "copy-assets": "npx copyfiles -u 2 \"src/ui/assets/**/*\" dist",
     "compile": "npm run build-js && npm run copy-assets",
     "watch": "npm run compile -- --watch",
     "bundle": "npm run build-js -- --minify && npm run copy-assets",

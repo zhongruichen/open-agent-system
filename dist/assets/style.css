@@ -1,0 +1,83 @@
+/* General Body Styles */
+body {
+    font-family: var(--vscode-font-family);
+    color: var(--vscode-editor-foreground);
+    background-color: var(--vscode-editor-background);
+    padding: 1em;
+}
+
+h1, h2 {
+    font-weight: 300;
+    border-bottom: 1px solid var(--vscode-editor-widget-border);
+    padding-bottom: 0.3em;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+}
+
+.section {
+    background-color: var(--vscode-sideBar-background);
+    border: 1px solid var(--vscode-editor-widget-border);
+    border-radius: 4px;
+    padding: 1em;
+}
+
+/* Plan List Styles */
+#plan-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+#plan-list li {
+    padding: 0.5em;
+    border-bottom: 1px solid var(--vscode-editor-background);
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+#plan-list li:last-child {
+    border-bottom: none;
+}
+
+.status-icon {
+    font-size: 1.2em;
+}
+
+.status-pending::before { content: '○'; color: var(--vscode-editor-foreground); }
+.status-in_progress::before { content: '◌'; color: var(--vscode-terminal-ansi-yellow); }
+.status-completed::before { content: '●'; color: var(--vscode-terminal-ansi-green); }
+.status-failed::before { content: '✕'; color: var(--vscode-terminal-ansi-red); }
+
+
+/* Log Box Styles */
+.log-box {
+    background-color: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-editor-widget-border);
+    border-radius: 4px;
+    padding: 0.5em;
+    height: 200px;
+    overflow-y: auto;
+    font-family: var(--vscode-editor-font-family);
+    font-size: var(--vscode-editor-font-size);
+}
+
+.log-box p {
+    margin: 0;
+    padding: 0.2em 0;
+    white-space: pre-wrap;
+}
+
+/* Code Box for Artifact */
+.code-box {
+    background-color: var(--vscode-textBlockQuote-background);
+    border: 1px solid var(--vscode-textBlockQuote-border);
+    border-radius: 4px;
+    padding: 1em;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: var(--vscode-editor-font-family);
+}
