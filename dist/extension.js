@@ -220,6 +220,74 @@ var require_webSearch = __commonJS({
   }
 });
 
+// src/tools/git.js
+var require_git = __commonJS({
+  "src/tools/git.js"(exports2, module2) {
+    "use strict";
+    var { exec } = require("child_process");
+    var vscode2 = require("vscode");
+    var workspaceRoot = vscode2.workspace.workspaceFolders ? vscode2.workspace.workspaceFolders[0].uri.fsPath : ".";
+    function executeCommand(command) {
+      return new Promise((resolve, reject) => {
+        exec(command, { cwd: workspaceRoot }, (error, stdout, stderr) => {
+          if (error) {
+            reject(`Error executing command: ${error.message}
+Stderr: ${stderr}`);
+            return;
+          }
+          resolve(stdout.trim());
+        });
+      });
+    }
+    async function getCurrentBranch() {
+      try {
+        const branchName = await executeCommand("git rev-parse --abbrev-ref HEAD");
+        return `Current branch is: ${branchName}`;
+      } catch (error) {
+        return `Error getting current branch: ${error}`;
+      }
+    }
+    async function createBranch(branchName) {
+      try {
+        if (!/^[a-zA-Z0-9\-_/]+$/.test(branchName)) {
+          throw new Error("Invalid branch name.");
+        }
+        await executeCommand(`git checkout -b ${branchName}`);
+        return `Successfully created and switched to new branch: ${branchName}`;
+      } catch (error) {
+        return `Error creating new branch: ${error}`;
+      }
+    }
+    async function stageFiles(files) {
+      try {
+        if (!Array.isArray(files) || files.length === 0) {
+          throw new Error("Files must be provided as a non-empty array.");
+        }
+        const filePaths = files.join(" ");
+        await executeCommand(`git add ${filePaths}`);
+        return `Successfully staged files: ${filePaths}`;
+      } catch (error) {
+        return `Error staging files: ${error}`;
+      }
+    }
+    async function commit(message) {
+      try {
+        const sanitizedMessage = message.replace(/"/g, '\\"');
+        await executeCommand(`git commit -m "${sanitizedMessage}"`);
+        return `Successfully committed with message: "${message}"`;
+      } catch (error) {
+        return `Error committing: ${error}`;
+      }
+    }
+    module2.exports = {
+      getCurrentBranch,
+      createBranch,
+      stageFiles,
+      commit
+    };
+  }
+});
+
 // src/tools/toolRegistry.js
 var require_toolRegistry = __commonJS({
   "src/tools/toolRegistry.js"(exports2, module2) {
@@ -227,13 +295,18 @@ var require_toolRegistry = __commonJS({
     var { writeFile, readFile, listFiles, summarizeFile } = require_fileSystem();
     var { executeCommand } = require_terminal();
     var { search } = require_webSearch();
+    var git = require_git();
     var toolRegistry = {
       "fileSystem.writeFile": writeFile,
       "fileSystem.readFile": readFile,
       "fileSystem.listFiles": listFiles,
       "fileSystem.summarizeFile": summarizeFile,
       "terminal.executeCommand": executeCommand,
-      "webSearch.search": search
+      "webSearch.search": search,
+      "git.getCurrentBranch": git.getCurrentBranch,
+      "git.createBranch": git.createBranch,
+      "git.stageFiles": git.stageFiles,
+      "git.commit": git.commit
     };
     async function executeTool2(toolName, args, logger2, { scannerAgent, workerProfile }) {
       logger2.logLine(`
@@ -265,6 +338,14 @@ var require_toolRegistry = __commonJS({
           result = await toolFunction(args.command);
         } else if (toolName === "webSearch.search") {
           result = await toolFunction(args.query);
+        } else if (toolName === "git.getCurrentBranch") {
+          result = await toolFunction();
+        } else if (toolName === "git.createBranch") {
+          result = await toolFunction(args.branchName);
+        } else if (toolName === "git.stageFiles") {
+          result = await toolFunction(args.files);
+        } else if (toolName === "git.commit") {
+          result = await toolFunction(args.message);
         } else {
           throw new Error(`Argument handling for tool "${toolName}" is not implemented.`);
         }
@@ -671,6 +752,14 @@ var require_workerAgent = __commonJS({
   - args: { "command": "<\u8981\u6267\u884C\u7684\u547D\u4EE4>" }
 - 'webSearch.search': \u6267\u884C\u7F51\u7EDC\u641C\u7D22\u4EE5\u67E5\u627E\u4FE1\u606F\u3001\u56DE\u7B54\u95EE\u9898\u6216\u83B7\u53D6\u793A\u4F8B\u3002
   - args: { "query": "<\u641C\u7D22\u67E5\u8BE2>" }
+- 'git.getCurrentBranch': \u83B7\u53D6\u5F53\u524D\u7684git\u5206\u652F\u540D\u79F0\u3002
+  - args: {}
+- 'git.createBranch': \u521B\u5EFA\u5E76\u5207\u6362\u5230\u4E00\u4E2A\u65B0\u7684git\u5206\u652F\u3002
+  - args: { "branchName": "<\u65B0\u5206\u652F\u7684\u540D\u79F0>" }
+- 'git.stageFiles': \u5C06\u6587\u4EF6\u6DFB\u52A0\u5230git\u6682\u5B58\u533A\u3002
+  - args: { "files": ["<\u6587\u4EF6\u8DEF\u5F841>", "<\u6587\u4EF6\u8DEF\u5F842>"] }
+- 'git.commit': \u63D0\u4EA4\u6682\u5B58\u7684\u6587\u4EF6\u3002
+  - args: { "message": "<\u63D0\u4EA4\u4FE1\u606F>" }
 
 \u4E0D\u8981\u6DFB\u52A0\u4EFB\u4F55\u89E3\u91CA\u3002\u53EA\u8F93\u51FAJSON\u5BF9\u8C61\u3002
 

@@ -1,6 +1,7 @@
 const { writeFile, readFile, listFiles, summarizeFile } = require('./fileSystem.js');
 const { executeCommand } = require('./terminal.js');
 const { search } = require('./webSearch.js');
+const git = require('./git.js');
 
 // The registry maps tool names to their implementation.
 const toolRegistry = {
@@ -10,6 +11,10 @@ const toolRegistry = {
     'fileSystem.summarizeFile': summarizeFile,
     'terminal.executeCommand': executeCommand,
     'webSearch.search': search,
+    'git.getCurrentBranch': git.getCurrentBranch,
+    'git.createBranch': git.createBranch,
+    'git.stageFiles': git.stageFiles,
+    'git.commit': git.commit,
 };
 
 /**
@@ -54,6 +59,14 @@ async function executeTool(toolName, args, logger, { scannerAgent, workerProfile
             result = await toolFunction(args.command);
         } else if (toolName === 'webSearch.search') {
             result = await toolFunction(args.query);
+        } else if (toolName === 'git.getCurrentBranch') {
+            result = await toolFunction();
+        } else if (toolName === 'git.createBranch') {
+            result = await toolFunction(args.branchName);
+        } else if (toolName === 'git.stageFiles') {
+            result = await toolFunction(args.files);
+        } else if (toolName === 'git.commit') {
+            result = await toolFunction(args.message);
         } else {
             throw new Error(`Argument handling for tool "${toolName}" is not implemented.`);
         }

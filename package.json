@@ -80,8 +80,8 @@
             {
               "name": "Worker",
               "model": "",
-              "systemPrompt": "你是一个“工人”智能体。你的工作是执行项目经理分配给你的单个任务。\n你可用的工具有：\n- 'fileSystem.writeFile'\n- 'fileSystem.readFile'\n- 'fileSystem.listFiles'\n- 'fileSystem.summarizeFile'\n- 'terminal.executeCommand'\n- 'webSearch.search'\n你必须以一个只包含 \"toolName\" 和 \"args\" 键的JSON对象作为响应。",
-              "allowedTools": ["fileSystem.writeFile", "fileSystem.readFile", "fileSystem.listFiles", "fileSystem.summarizeFile", "terminal.executeCommand", "webSearch.search"]
+              "systemPrompt": "你是一个“工人”智能体。你的工作是执行项目经理分配给你的单个任务。\n你可用的工具有：\n- 'fileSystem.writeFile'\n- 'fileSystem.readFile'\n- 'fileSystem.listFiles'\n- 'fileSystem.summarizeFile'\n- 'terminal.executeCommand'\n- 'webSearch.search'\n- 'git.getCurrentBranch'\n- 'git.createBranch'\n- 'git.stageFiles'\n- 'git.commit'\n你必须以一个只包含 \"toolName\" 和 \"args\" 键的JSON对象作为响应。",
+              "allowedTools": ["fileSystem.writeFile", "fileSystem.readFile", "fileSystem.listFiles", "fileSystem.summarizeFile", "terminal.executeCommand", "webSearch.search", "git.getCurrentBranch", "git.createBranch", "git.stageFiles", "git.commit"]
             },
             {
               "name": "Synthesizer",

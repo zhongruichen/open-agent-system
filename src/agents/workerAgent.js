@@ -21,6 +21,14 @@ const SYSTEM_PROMPT = `你是一个“工人”智能体。你的工作是执行
   - args: { "command": "<要执行的命令>" }
 - 'webSearch.search': 执行网络搜索以查找信息、回答问题或获取示例。
   - args: { "query": "<搜索查询>" }
+- 'git.getCurrentBranch': 获取当前的git分支名称。
+  - args: {}
+- 'git.createBranch': 创建并切换到一个新的git分支。
+  - args: { "branchName": "<新分支的名称>" }
+- 'git.stageFiles': 将文件添加到git暂存区。
+  - args: { "files": ["<文件路径1>", "<文件路径2>"] }
+- 'git.commit': 提交暂存的文件。
+  - args: { "message": "<提交信息>" }
 
 不要添加任何解释。只输出JSON对象。
 
