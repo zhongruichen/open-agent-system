@@ -906,6 +906,78 @@ ${contentSnippet}
   }
 });
 
+// src/agents/reflectorAgent.js
+var require_reflectorAgent = __commonJS({
+  "src/agents/reflectorAgent.js"(exports2, module2) {
+    "use strict";
+    var { BaseAgent } = require_baseAgent();
+    var SYSTEM_PROMPT = `\u4F60\u662F\u4E00\u4E2A\u201C\u53CD\u601D\u8005\u201D\u667A\u80FD\u4F53\u3002\u4F60\u7684\u5DE5\u4F5C\u662F\u8BCA\u65AD\u53E6\u4E00\u4E2A\u667A\u80FD\u4F53\u6267\u884C\u4EFB\u52A1\u5931\u8D25\u7684\u539F\u56E0\uFF0C\u5E76\u63D0\u51FA\u4E00\u4E2A\u5177\u4F53\u7684\u3001\u4FEE\u6B63\u540E\u7684\u4E0B\u4E00\u6B65\u884C\u52A8\u3002
+
+\u4F60\u5C06\u6536\u5230\u5931\u8D25\u7684\u5B50\u4EFB\u52A1\u63CF\u8FF0\u548C\u5B83\u4EA7\u751F\u7684\u9519\u8BEF\u4FE1\u606F\u3002
+\u4F60\u7684\u76EE\u6807\u4E0D\u662F\u53BB\u6267\u884C\u4EFB\u52A1\uFF0C\u800C\u662F\u63D0\u4F9B\u4E00\u4E2A\u6E05\u6670\u7684\u8BCA\u65AD\u548C\u53EF\u884C\u7684\u89E3\u51B3\u65B9\u6848\u3002
+
+\u4F60\u5FC5\u987B\u4EE5\u4E00\u4E2A\u53EA\u5305\u542B "cause" \u548C "nextStep" \u952E\u7684JSON\u5BF9\u8C61\u4F5C\u4E3A\u54CD\u5E94\u3002
+- "cause": \u5BF9\u5931\u8D25\u6839\u672C\u539F\u56E0\u7684\u7B80\u8981\u5206\u6790\uFF08\u4F8B\u5982\uFF0C\u201C\u6587\u4EF6\u672A\u627E\u5230\uFF0C\u53EF\u80FD\u662F\u8DEF\u5F84\u9519\u8BEF\u201D\u6216\u201C\u547D\u4EE4\u8BED\u6CD5\u4E0D\u6B63\u786E\u201D\uFF09\u3002
+- "nextStep": \u4E00\u4E2A\u5168\u65B0\u7684\u3001\u5B8C\u6574\u7684\u3001\u4FEE\u6B63\u540E\u7684\u5B50\u4EFB\u52A1\u63CF\u8FF0\uFF0C\u4F9B\u201C\u5DE5\u4EBA\u201D\u667A\u80FD\u4F53\u4E0B\u4E00\u6B21\u5C1D\u8BD5\u3002\u8FD9\u4E2A\u63CF\u8FF0\u5E94\u8BE5\u76F4\u63A5\u89E3\u51B3\u4F60\u5206\u6790\u51FA\u7684\u5931\u8D25\u539F\u56E0\u3002
+
+\u4F8B\u5982\uFF0C\u5BF9\u4E8E\u5931\u8D25\u7684\u4EFB\u52A1\u201C\u8BFB\u53D6 'data/user.txt'\u201D\u548C\u9519\u8BEF\u201CError: ENOENT: no such file or directory\u201D\uFF0C\u4E00\u4E2A\u597D\u7684\u54CD\u5E94\u662F\uFF1A
+{
+  "cause": "\u6587\u4EF6 'data/user.txt' \u672A\u627E\u5230\u3002\u53EF\u80FD\u662F\u8DEF\u5F84\u4E0D\u6B63\u786E\u6216\u6587\u4EF6\u5C1A\u4E0D\u5B58\u5728\u3002",
+  "nextStep": "\u5217\u51FA\u6839\u76EE\u5F55\u4E0B\u7684\u6587\u4EF6\u548C\u6587\u4EF6\u5939\uFF0C\u4EE5\u786E\u8BA4 'data/user.txt' \u7684\u6B63\u786E\u8DEF\u5F84\u3002"
+}
+
+\u53E6\u4E00\u4E2A\u4F8B\u5B50\uFF0C\u5BF9\u4E8E\u5931\u8D25\u7684\u4EFB\u52A1\u201C\u8FD0\u884C\u547D\u4EE4 'git comit -m "Initial commit"'\u201D\u548C\u9519\u8BEF\u201C'comit' is not a git command\u201D\uFF0C\u4E00\u4E2A\u597D\u7684\u54CD\u5E94\u662F\uFF1A
+{
+  "cause": "Git\u547D\u4EE4 'comit' \u62FC\u5199\u9519\u8BEF\u3002",
+  "nextStep": "\u8FD0\u884C\u547D\u4EE4 'git commit -m "Initial commit"'"
+}
+
+\u4E0D\u8981\u6DFB\u52A0\u4EFB\u4F55\u989D\u5916\u7684\u89E3\u91CA\u3002\u53EA\u8F93\u51FAJSON\u5BF9\u8C61\u3002`;
+    var ReflectorAgent2 = class extends BaseAgent {
+      constructor(modelConfig) {
+        super(modelConfig, SYSTEM_PROMPT);
+      }
+      /**
+       * Analyzes a failed task and suggests a correction.
+       * @param {import('./taskContext').SubTask} failedTask The sub-task that failed.
+       * @returns {Promise<{cause: string, nextStep: string}>} An object containing the cause and the corrected next step.
+       */
+      async executeTask(failedTask) {
+        const userPrompt = `\u5B50\u4EFB\u52A1\u5931\u8D25\u4E86\u3002
+
+\u539F\u59CB\u4EFB\u52A1\u63CF\u8FF0: "${failedTask.description}"
+
+\u9519\u8BEF\u4FE1\u606F: "${failedTask.error}"
+
+\u8BF7\u5206\u6790\u5931\u8D25\u539F\u56E0\u5E76\u63D0\u4F9B\u4FEE\u6B63\u540E\u7684\u4E0B\u4E00\u6B65\u3002`;
+        const responseJson = await this.llmRequest(userPrompt, true);
+        try {
+          const responseObject = JSON.parse(responseJson);
+          if (responseObject && responseObject.cause && responseObject.nextStep) {
+            return responseObject;
+          } else {
+            throw new Error("\u6765\u81EA\u53CD\u601D\u8005\u7684\u54CD\u5E94\u4E0D\u662F\u4E00\u4E2A\u6709\u6548\u7684JSON\u5BF9\u8C61\u3002");
+          }
+        } catch (e) {
+          const jsonMatch = responseJson.match(/```json\n([\s\S]*?)\n```/);
+          if (jsonMatch && jsonMatch[1]) {
+            try {
+              const parsed = JSON.parse(jsonMatch[1]);
+              if (parsed && parsed.cause && parsed.nextStep) {
+                return parsed;
+              }
+            } catch (parseError) {
+              throw new Error(`\u65E0\u6CD5\u4ECELLM\u54CD\u5E94\u4E2D\u89E3\u6790\u53CD\u601D\u7ED3\u679C\uFF0C\u5373\u4F7F\u5728\u627E\u5230JSON\u5757\u4E4B\u540E\u3002\u9519\u8BEF: ${parseError.message}`);
+            }
+          }
+          throw new Error(`\u65E0\u6CD5\u4ECELLM\u54CD\u5E94\u4E2D\u89E3\u6790\u53CD\u601D\u7ED3\u679C\u3002\u9519\u8BEF: ${e.message}`);
+        }
+      }
+    };
+    module2.exports = { ReflectorAgent: ReflectorAgent2 };
+  }
+});
+
 // src/ui/mainPanel.js
 var require_mainPanel = __commonJS({
   "src/ui/mainPanel.js"(exports2, module2) {
@@ -1017,6 +1089,7 @@ var { SynthesizerAgent } = require_synthesizerAgent();
 var { EvaluatorAgent } = require_evaluatorAgent();
 var { CritiqueAggregationAgent } = require_critiqueAggregationAgent();
 var { CodebaseScannerAgent } = require_codebaseScannerAgent();
+var { ReflectorAgent } = require_reflectorAgent();
 var { MainPanel } = require_mainPanel();
 async function scanProject(scannerAgent, enableSmartScan) {
   const message = enableSmartScan ? "\u6B63\u5728\u5FEB\u901F\u626B\u63CF\u9879\u76EE\u7ED3\u6784..." : "\u6B63\u5728\u6DF1\u5EA6\u626B\u63CF\u9879\u76EE\u4EE3\u7801\u5E93...";
@@ -1161,6 +1234,8 @@ ${error.stack}`);
     const synthesizer = new SynthesizerAgent(getModelsForRole("synthesizer")[0]);
     const critiqueAggregator = new CritiqueAggregationAgent(getModelsForRole("critiqueAggregator")[0]);
     const evaluationTeamConfigs = getModelsForRole("evaluationTeam");
+    const reflectorConfig = getModelsForRole("reflector");
+    const reflectorAgent = reflectorConfig ? new ReflectorAgent(reflectorConfig[0]) : null;
     async function executeSingleTask(subTask) {
       taskContext.updateTaskStatus(subTask.id, "in_progress");
       MainPanel.update({ command: "updatePlan", plan: taskContext.subTasks });
@@ -1191,11 +1266,26 @@ ${workerResult.args.command}
         } catch (e) {
           attempts++;
           lastError = e.message;
+          subTask.error = lastError;
           MainPanel.update({ command: "log", text: `\u4EFB\u52A1 ${subTask.id} \u7B2C ${attempts} \u6B21\u5C1D\u8BD5\u5931\u8D25: ${lastError}` });
           if (attempts < MAX_ATTEMPTS_PER_TASK) {
-            subTask.description = `${subTask.description.split("\n\n")[0]}
+            if (reflectorAgent) {
+              MainPanel.update({ command: "log", text: "\u6B63\u5728\u8C03\u7528\u53CD\u601D\u8005\u667A\u80FD\u4F53\u5206\u6790\u5931\u8D25\u539F\u56E0..." });
+              try {
+                const reflection = await reflectorAgent.executeTask(subTask);
+                MainPanel.update({ command: "log", text: `\u53CD\u601D\u8005\u5206\u6790\u539F\u56E0: ${reflection.cause}` });
+                subTask.description = reflection.nextStep;
+              } catch (reflectionError) {
+                MainPanel.update({ command: "log", text: `\u53CD\u601D\u8005\u667A\u80FD\u4F53\u5931\u8D25: ${reflectionError.message}` });
+                subTask.description = `${subTask.description.split("\n\n")[0]}
 
 (\u524D\u4E00\u6B21\u5C1D\u8BD5\u5931\u8D25\uFF0C\u9519\u8BEF\u4FE1\u606F: ${lastError}). \u8BF7\u5206\u6790\u6B64\u9519\u8BEF\u5E76\u5C1D\u8BD5\u4E0D\u540C\u7684\u65B9\u6CD5\u3002`;
+              }
+            } else {
+              subTask.description = `${subTask.description.split("\n\n")[0]}
+
+(\u524D\u4E00\u6B21\u5C1D\u8BD5\u5931\u8D25\uFF0C\u9519\u8BEF\u4FE1\u606F: ${lastError}). \u8BF7\u5206\u6790\u6B64\u9519\u8BEF\u5E76\u5C1D\u8BD5\u4E0D\u540C\u7684\u65B9\u6CD5\u3002`;
+            }
             MainPanel.update({ command: "log", text: `\u6B63\u5728\u91CD\u8BD5\u4EFB\u52A1 ${subTask.id}...` });
           }
         }

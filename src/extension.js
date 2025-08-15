@@ -11,6 +11,7 @@ const { SynthesizerAgent } = require('./agents/synthesizerAgent');
 const { EvaluatorAgent } = require('./agents/evaluatorAgent');
 const { CritiqueAggregationAgent } = require('./agents/critiqueAggregationAgent');
 const { CodebaseScannerAgent } = require('./agents/codebaseScannerAgent');
+const { ReflectorAgent } = require('./agents/reflectorAgent.js');
 const { MainPanel } = require('./ui/mainPanel');
 
 async function scanProject(scannerAgent, enableSmartScan) {
@@ -176,6 +177,10 @@ function activate(context) {
         const critiqueAggregator = new CritiqueAggregationAgent(getModelsForRole('critiqueAggregator')[0]);
         const evaluationTeamConfigs = getModelsForRole('evaluationTeam');
 
+        const reflectorConfig = getModelsForRole('reflector');
+        const reflectorAgent = reflectorConfig ? new ReflectorAgent(reflectorConfig[0]) : null;
+
+
         // This function encapsulates the logic for executing a single task.
         async function executeSingleTask(subTask) {
             taskContext.updateTaskStatus(subTask.id, 'in_progress');
@@ -204,9 +209,24 @@ function activate(context) {
                 } catch (e) {
                     attempts++;
                     lastError = e.message;
+                    subTask.error = lastError; // Store error on the task
                     MainPanel.update({ command: 'log', text: `任务 ${subTask.id} 第 ${attempts} 次尝试失败: ${lastError}` });
+
                     if (attempts < MAX_ATTEMPTS_PER_TASK) {
-                        subTask.description = `${subTask.description.split('\n\n')[0]}\n\n(前一次尝试失败，错误信息: ${lastError}). 请分析此错误并尝试不同的方法。`;
+                        if (reflectorAgent) {
+                            MainPanel.update({ command: 'log', text: '正在调用反思者智能体分析失败原因...' });
+                            try {
+                                const reflection = await reflectorAgent.executeTask(subTask);
+                                MainPanel.update({ command: 'log', text: `反思者分析原因: ${reflection.cause}` });
+                                subTask.description = reflection.nextStep; // Update task with corrected step
+                            } catch (reflectionError) {
+                                MainPanel.update({ command: 'log', text: `反思者智能体失败: ${reflectionError.message}` });
+                                // Fallback to original retry logic
+                                subTask.description = `${subTask.description.split('\n\n')[0]}\n\n(前一次尝试失败，错误信息: ${lastError}). 请分析此错误并尝试不同的方法。`;
+                            }
+                        } else {
+                             subTask.description = `${subTask.description.split('\n\n')[0]}\n\n(前一次尝试失败，错误信息: ${lastError}). 请分析此错误并尝试不同的方法。`;
+                        }
                         MainPanel.update({ command: 'log', text: `正在重试任务 ${subTask.id}...` });
                     }
                 }

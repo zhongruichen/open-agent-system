@@ -99,6 +99,10 @@
             "codebaseScanner": {
               "type": "string",
               "description": "用于扫描和总结代码库中文件内容的模型。建议使用速度快的模型。"
+            },
+            "reflector": {
+              "type": "string",
+              "description": "用于分析失败并提出修正建议的模型。"
             }
           }
         }

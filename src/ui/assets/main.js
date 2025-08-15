@@ -167,7 +167,7 @@
 
     function renderRoleAssignments() {
         roleAssignmentsEl.innerHTML = '';
-        const roles = ['orchestrator', 'worker', 'synthesizer', 'critiqueAggregator', 'codebaseScanner'];
+        const roles = ['orchestrator', 'worker', 'synthesizer', 'critiqueAggregator', 'codebaseScanner', 'reflector'];
         const modelNames = state.models.map(m => m.name);
 
         roles.forEach(role => {
