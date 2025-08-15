@@ -15,6 +15,32 @@ const { ReflectorAgent } = require('./agents/reflectorAgent.js');
 const EventEmitter = require('events');
 const { MainPanel } = require('./ui/mainPanel');
 
+// --- Debug State Manager ---
+let activeDebugSession = null;
+
+function setupDebugListeners() {
+    vscode.debug.onDidStartDebugSession(session => {
+        activeDebugSession = session;
+        MainPanel.update({ command: 'log', text: `调试会话已开始: ${session.name} (类型: ${session.type})` });
+        MainPanel.update({ command: 'updateDebuggerState', state: { isActive: true, sessionName: session.name } });
+    });
+
+    vscode.debug.onDidTerminateDebugSession(session => {
+        activeDebugSession = null;
+        MainPanel.update({ command: 'log', text: `调试会话已终止: ${session.name}` });
+        MainPanel.update({ command: 'updateDebuggerState', state: { isActive: false, sessionName: null } });
+    });
+
+    // Initial check in case a session is already active when the extension loads
+    if (vscode.debug.activeDebugSession) {
+        activeDebugSession = vscode.debug.activeDebugSession;
+        MainPanel.update({ command: 'log', text: `检测到已激活的调试会话: ${activeDebugSession.name}` });
+         MainPanel.update({ command: 'updateDebuggerState', state: { isActive: true, sessionName: activeDebugSession.name } });
+    }
+}
+// --- End Debug State Manager ---
+
+
 async function scanProject(scannerAgent, enableSmartScan) {
     const message = enableSmartScan ? '正在快速扫描项目结构...' : '正在深度扫描项目代码库...';
     MainPanel.update({ command: 'log', text: message });
@@ -88,6 +114,8 @@ async function migrateSettings(config) {
 
 
 function activate(context) {
+    setupDebugListeners();
+
     // Run migration once on activation
     migrateSettings(vscode.workspace.getConfiguration('multiAgent'));
 

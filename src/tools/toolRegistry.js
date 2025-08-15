@@ -2,6 +2,7 @@ const { writeFile, readFile, listFiles, summarizeFile } = require('./fileSystem.
 const { executeCommand } = require('./terminal.js');
 const { search } = require('./webSearch.js');
 const git = require('./git.js');
+const dbg = require('./debugger.js');
 
 // The registry maps tool names to their implementation.
 const toolRegistry = {
@@ -15,6 +16,15 @@ const toolRegistry = {
     'git.createBranch': git.createBranch,
     'git.stageFiles': git.stageFiles,
     'git.commit': git.commit,
+    'debugger.start': dbg.start,
+    'debugger.stop': dbg.stop,
+    'debugger.addBreakpoint': dbg.addBreakpoint,
+    'debugger.removeBreakpoint': dbg.removeBreakpoint,
+    'debugger.next': dbg.next,
+    'debugger.stepIn': dbg.stepIn,
+    'debugger.stepOut': dbg.stepOut,
+    'debugger.continue': dbg.continue,
+    'debugger.evaluate': dbg.evaluate,
 };
 
 /**
@@ -67,6 +77,14 @@ async function executeTool(toolName, args, logger, { scannerAgent, workerProfile
             result = await toolFunction(args.files);
         } else if (toolName === 'git.commit') {
             result = await toolFunction(args.message);
+        } else if (toolName === 'debugger.start') {
+            result = await toolFunction(args.configName);
+        } else if (toolName === 'debugger.stop' || toolName === 'debugger.next' || toolName === 'debugger.stepIn' || toolName === 'debugger.stepOut' || toolName === 'debugger.continue') {
+            result = await toolFunction();
+        } else if (toolName === 'debugger.addBreakpoint' || toolName === 'debugger.removeBreakpoint') {
+            result = await toolFunction(args.file, args.line);
+        } else if (toolName === 'debugger.evaluate') {
+            result = await toolFunction(args.expression);
         } else {
             throw new Error(`Argument handling for tool "${toolName}" is not implemented.`);
         }
