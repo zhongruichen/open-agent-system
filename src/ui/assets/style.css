@@ -57,6 +57,40 @@ h1, h2 {
     word-wrap: break-word;
 }
 
+/* Plan Review Styles */
+#plan-review-container {
+    border-top: 1px solid var(--vscode-editor-widget-border);
+    margin-top: 1em;
+    padding-top: 1em;
+}
+
+.editable-step {
+    margin-bottom: 1em;
+    padding: 1em;
+    border: 1px solid var(--vscode-editor-widget-border);
+    border-radius: 4px;
+}
+
+.editable-step textarea {
+    width: 100%;
+    min-height: 60px;
+    background-color: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 2px;
+    font-family: var(--vscode-editor-font-family);
+}
+
+.editable-step label {
+    display: block;
+    margin-bottom: 0.5em;
+    font-weight: bold;
+}
+
+.step-buttons {
+    margin-top: 0.5em;
+}
+
 #plan-list li:last-child {
     border-bottom: none;
 }

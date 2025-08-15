@@ -12,6 +12,7 @@ const { EvaluatorAgent } = require('./agents/evaluatorAgent');
 const { CritiqueAggregationAgent } = require('./agents/critiqueAggregationAgent');
 const { CodebaseScannerAgent } = require('./agents/codebaseScannerAgent');
 const { ReflectorAgent } = require('./agents/reflectorAgent.js');
+const EventEmitter = require('events');
 const { MainPanel } = require('./ui/mainPanel');
 
 async function scanProject(scannerAgent, enableSmartScan) {
@@ -108,10 +109,12 @@ function activate(context) {
         context.globalState.update(a_key, true);
     }
 
+    const taskEventEmitter = new EventEmitter();
+
     let disposable = vscode.commands.registerCommand('multi-agent-helper.startTask', async () => {
         try {
             logger.createLogChannel();
-            MainPanel.createOrShow(context.extensionPath);
+            MainPanel.createOrShow(context.extensionPath, taskEventEmitter);
             const config = vscode.workspace.getConfiguration('multiAgent');
             const enablePersistence = config.get('enablePersistence', false);
 
@@ -164,6 +167,25 @@ function activate(context) {
             logger.logLine(`\n--- 发生严重错误 ---\n${error.stack}`);
         }
     });
+
+    async function awaitPlanApproval(initialPlan) {
+        // Do not ask for approval in auto-mode
+        if (vscode.workspace.getConfiguration('multiAgent').get('enableAutoMode', false)) {
+            MainPanel.update({ command: 'log', text: '自动模式已启用，自动批准计划。' });
+            return initialPlan;
+        }
+
+        MainPanel.update({ command: 'showPlanForReview', plan: initialPlan });
+
+        return new Promise((resolve, reject) => {
+            taskEventEmitter.once('planApproved', (newPlan) => {
+                resolve(newPlan);
+            });
+            taskEventEmitter.once('planCancelled', () => {
+                reject(new Error("任务被用户取消。"));
+            });
+        });
+    }
 
     async function runTaskExecution(taskContext, config) {
         // This function now contains the main loop for task execution.
@@ -244,8 +266,9 @@ function activate(context) {
 
             // Only create a new plan if there are no pending tasks
             if (taskContext.subTasks.every(t => t.status !== 'pending' && t.status !== 'in_progress')) {
-                 const plan = await orchestrator.executeTask(taskContext);
-                 taskContext.setNewPlanForIteration(plan);
+                 const initialPlan = await orchestrator.executeTask(taskContext);
+                 const approvedPlan = await awaitPlanApproval(initialPlan);
+                 taskContext.setNewPlanForIteration(approvedPlan);
                  MainPanel.update({ command: 'updatePlan', plan: taskContext.subTasks });
                  if (enablePersistence) await saveTaskState(taskContext);
             }
@@ -283,6 +306,10 @@ function activate(context) {
 
             const artifact = await synthesizer.executeTask(taskContext);
             MainPanel.update({ command: 'showArtifact', artifact: artifact });
+
+            // After the stream is complete, re-highlight the entire block
+            MainPanel.update({ command: 'highlightArtifact' });
+
 
             const evaluationPromises = evaluationTeamConfigs.map(config => {
                 const evaluator = new EvaluatorAgent(config);

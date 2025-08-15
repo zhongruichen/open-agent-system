@@ -9,18 +9,16 @@ class MainPanel {
     static currentPanel = undefined;
     static viewType = 'multiAgentStatus';
 
-    static createOrShow(extensionPath) {
+    static createOrShow(extensionPath, eventEmitter) {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
 
-        // If we already have a panel, show it.
         if (MainPanel.currentPanel) {
             MainPanel.currentPanel.panel.reveal(column);
             return;
         }
 
-        // Otherwise, create a new panel.
         const panel = vscode.window.createWebviewPanel(
             MainPanel.viewType,
             'Multi-Agent Status',
@@ -31,7 +29,7 @@ class MainPanel {
             }
         );
 
-        MainPanel.currentPanel = new MainPanel(panel, extensionPath);
+        MainPanel.currentPanel = new MainPanel(panel, extensionPath, eventEmitter);
     }
 
     static update(message) {
@@ -40,14 +38,13 @@ class MainPanel {
         }
     }
 
-    constructor(panel, extensionPath) {
+    constructor(panel, extensionPath, eventEmitter) {
         this.panel = panel;
         this.extensionPath = extensionPath;
+        this.eventEmitter = eventEmitter;
 
-        // Set the webview's initial html content
         this.panel.webview.html = this._getHtmlForWebview();
 
-        // Listen for messages from the webview
         this.panel.webview.onDidReceiveMessage(
             async message => {
                 switch (message.command) {
@@ -56,7 +53,12 @@ class MainPanel {
                         return;
                     case 'saveSettings':
                         await this.saveSettings(message.settings);
-                        // Optional: Send a confirmation back to the webview
+                        return;
+                    case 'planApproved':
+                        this.eventEmitter.emit('planApproved', message.plan);
+                        return;
+                    case 'cancelTask':
+                        this.eventEmitter.emit('planCancelled');
                         return;
                 }
             },
@@ -64,7 +66,6 @@ class MainPanel {
             []
         );
 
-        // Listen for when the panel is disposed
         this.panel.onDidDispose(() => this.dispose(), null, []);
     }
 
@@ -85,7 +86,6 @@ class MainPanel {
 
     async saveSettings(settings) {
         const config = vscode.workspace.getConfiguration('multiAgent');
-        // Update settings in VS Code configuration
         await config.update('models', settings.models, vscode.ConfigurationTarget.Workspace);
         await config.update('roleAssignments', settings.roleAssignments, vscode.ConfigurationTarget.Workspace);
         await config.update('enableSmartScan', settings.enableSmartScan, vscode.ConfigurationTarget.Workspace);
@@ -95,6 +95,8 @@ class MainPanel {
     }
 
     dispose() {
+        // Also emit a cancel event if the panel is closed during review
+        this.eventEmitter.emit('planCancelled');
         MainPanel.currentPanel = undefined;
         this.panel.dispose();
     }
@@ -104,7 +106,6 @@ class MainPanel {
         const htmlPath = path.join(assetsPath, 'index.html');
         let htmlContent = fs.readFileSync(htmlPath, 'utf8');
 
-        // Replace local asset paths with webview-compatible URIs
         htmlContent = htmlContent.replace(/(href|src)="([^"]+)"/g, (match, p1, p2) => {
             const assetUri = vscode.Uri.file(path.join(assetsPath, p2));
             const webviewUri = this.panel.webview.asWebviewUri(assetUri);

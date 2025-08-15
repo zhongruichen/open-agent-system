@@ -406,9 +406,10 @@ var require_provider = __commonJS({
        * Makes a chat completion request.
        * @param {Array<object>} messages The array of message objects.
        * @param {boolean} [jsonMode=false] Whether to enable JSON mode.
-       * @returns {Promise<string>} The content of the assistant's response.
+       * @param {(chunk: string) => void} [onStreamChunk=null] A callback for handling streaming chunks.
+       * @returns {Promise<string>} The full content of the assistant's response.
        */
-      async chatCompletion(messages, jsonMode = false) {
+      async chatCompletion(messages, jsonMode = false, onStreamChunk = null) {
         const { apiKey, baseUrl, modelName } = this.modelConfig;
         const url = new URL(baseUrl || "https://api.openai.com");
         url.pathname = url.pathname.replace(/\/v1\/?$/, "") + "/v1/chat/completions";
@@ -418,6 +419,10 @@ var require_provider = __commonJS({
         };
         if (jsonMode) {
           requestBody.response_format = { type: "json_object" };
+        }
+        const useStream = !!onStreamChunk;
+        if (useStream) {
+          requestBody.stream = true;
         }
         const options = {
           method: "POST",
@@ -431,14 +436,44 @@ var require_provider = __commonJS({
         };
         return new Promise((resolve, reject) => {
           const req = https.request(options, (res) => {
-            let data = "";
+            let fullContent = "";
+            if (res.statusCode < 200 || res.statusCode >= 300) {
+              let errorData = "";
+              res.on("data", (chunk) => errorData += chunk);
+              res.on("end", () => reject(new Error(`API request failed with status ${res.statusCode}: ${errorData}`)));
+              return;
+            }
             res.on("data", (chunk) => {
-              data += chunk;
+              const chunkStr = chunk.toString();
+              if (useStream) {
+                const lines = chunkStr.split("\n").filter((line) => line.trim() !== "");
+                for (const line of lines) {
+                  if (line.startsWith("data: ")) {
+                    const dataStr = line.substring(6);
+                    if (dataStr === "[DONE]") {
+                      return;
+                    }
+                    try {
+                      const data = JSON.parse(dataStr);
+                      const deltaContent = data.choices[0]?.delta?.content;
+                      if (deltaContent) {
+                        fullContent += deltaContent;
+                        onStreamChunk(deltaContent);
+                      }
+                    } catch (e) {
+                    }
+                  }
+                }
+              } else {
+                fullContent += chunkStr;
+              }
             });
             res.on("end", () => {
-              if (res.statusCode >= 200 && res.statusCode < 300) {
+              if (useStream) {
+                resolve(fullContent);
+              } else {
                 try {
-                  const responseJson = JSON.parse(data);
+                  const responseJson = JSON.parse(fullContent);
                   const content = responseJson.choices[0]?.message?.content;
                   if (content) {
                     resolve(content);
@@ -448,8 +483,6 @@ var require_provider = __commonJS({
                 } catch (e) {
                   reject(new Error(`Failed to parse API response: ${e.message}`));
                 }
-              } else {
-                reject(new Error(`API request failed with status ${res.statusCode}: ${data}`));
               }
             });
           });
@@ -489,12 +522,12 @@ var require_baseAgent = __commonJS({
        * @param {boolean} [jsonMode=false] Whether to request a JSON response from the LLM.
        * @returns {Promise<string>} The text content of the LLM's response.
        */
-      async llmRequest(userPrompt, jsonMode = false) {
+      async llmRequest(userPrompt, jsonMode = false, onStreamChunk = null) {
         const messages = [
           { role: "system", content: this.systemPrompt },
           { role: "user", content: userPrompt }
         ];
-        return this.provider.chatCompletion(messages, jsonMode);
+        return this.provider.chatCompletion(messages, jsonMode, onStreamChunk);
       }
       /**
        * A placeholder for the main task execution logic, to be implemented by subclasses.
@@ -694,6 +727,111 @@ ${taskContext.overallProgress}`;
   }
 });
 
+// src/ui/mainPanel.js
+var require_mainPanel = __commonJS({
+  "src/ui/mainPanel.js"(exports2, module2) {
+    "use strict";
+    var vscode2 = require("vscode");
+    var path2 = require("path");
+    var fs2 = require("fs");
+    var MainPanel2 = class _MainPanel {
+      static currentPanel = void 0;
+      static viewType = "multiAgentStatus";
+      static createOrShow(extensionPath, eventEmitter) {
+        const column = vscode2.window.activeTextEditor ? vscode2.window.activeTextEditor.viewColumn : void 0;
+        if (_MainPanel.currentPanel) {
+          _MainPanel.currentPanel.panel.reveal(column);
+          return;
+        }
+        const panel = vscode2.window.createWebviewPanel(
+          _MainPanel.viewType,
+          "Multi-Agent Status",
+          column || vscode2.ViewColumn.Two,
+          {
+            enableScripts: true,
+            localResourceRoots: [vscode2.Uri.file(path2.join(extensionPath, "dist", "assets"))]
+          }
+        );
+        _MainPanel.currentPanel = new _MainPanel(panel, extensionPath, eventEmitter);
+      }
+      static update(message) {
+        if (_MainPanel.currentPanel) {
+          _MainPanel.currentPanel.panel.webview.postMessage(message);
+        }
+      }
+      constructor(panel, extensionPath, eventEmitter) {
+        this.panel = panel;
+        this.extensionPath = extensionPath;
+        this.eventEmitter = eventEmitter;
+        this.panel.webview.html = this._getHtmlForWebview();
+        this.panel.webview.onDidReceiveMessage(
+          async (message) => {
+            switch (message.command) {
+              case "getSettings":
+                this.sendSettingsToWebview();
+                return;
+              case "saveSettings":
+                await this.saveSettings(message.settings);
+                return;
+              case "planApproved":
+                this.eventEmitter.emit("planApproved", message.plan);
+                return;
+              case "cancelTask":
+                this.eventEmitter.emit("planCancelled");
+                return;
+            }
+          },
+          null,
+          []
+        );
+        this.panel.onDidDispose(() => this.dispose(), null, []);
+      }
+      sendSettingsToWebview() {
+        const config = vscode2.workspace.getConfiguration("multiAgent");
+        this.panel.webview.postMessage({
+          command: "receiveSettings",
+          settings: {
+            models: config.get("models", []),
+            roleAssignments: config.get("roleAssignments", {}),
+            enableSmartScan: config.get("enableSmartScan", false),
+            enableParallelExec: config.get("enableParallelExec", false),
+            enableAutoMode: config.get("enableAutoMode", false),
+            enablePersistence: config.get("enablePersistence", false)
+          }
+        });
+      }
+      async saveSettings(settings) {
+        const config = vscode2.workspace.getConfiguration("multiAgent");
+        await config.update("models", settings.models, vscode2.ConfigurationTarget.Workspace);
+        await config.update("roleAssignments", settings.roleAssignments, vscode2.ConfigurationTarget.Workspace);
+        await config.update("enableSmartScan", settings.enableSmartScan, vscode2.ConfigurationTarget.Workspace);
+        await config.update("enableParallelExec", settings.enableParallelExec, vscode2.ConfigurationTarget.Workspace);
+        await config.update("enableAutoMode", settings.enableAutoMode, vscode2.ConfigurationTarget.Workspace);
+        await config.update("enablePersistence", settings.enablePersistence, vscode2.ConfigurationTarget.Workspace);
+      }
+      dispose() {
+        this.eventEmitter.emit("planCancelled");
+        _MainPanel.currentPanel = void 0;
+        this.panel.dispose();
+      }
+      _getHtmlForWebview() {
+        const assetsPath = path2.join(this.extensionPath, "dist", "assets");
+        const htmlPath = path2.join(assetsPath, "index.html");
+        let htmlContent = fs2.readFileSync(htmlPath, "utf8");
+        htmlContent = htmlContent.replace(/(href|src)="([^"]+)"/g, (match, p1, p2) => {
+          const assetUri = vscode2.Uri.file(path2.join(assetsPath, p2));
+          const webviewUri = this.panel.webview.asWebviewUri(assetUri);
+          return `${p1}="${webviewUri}"`;
+        });
+        return htmlContent;
+      }
+    };
+    module2.exports = {
+      MainPanel: MainPanel2
+    };
+  }
+});
+
 // src/agents/synthesizerAgent.js
 var require_synthesizerAgent = __commonJS({
   "src/agents/synthesizerAgent.js"(exports2, module2) {
@@ -716,6 +854,7 @@ var require_synthesizerAgent = __commonJS({
        * @returns {Promise<string>} The final artifact.
        */
       async executeTask(taskContext) {
+        const { MainPanel: MainPanel2 } = require_mainPanel();
         let userPrompt = `\u539F\u59CB\u7528\u6237\u8BF7\u6C42\u662F: "${taskContext.originalUserRequest}"`;
         userPrompt += `
 
@@ -724,7 +863,11 @@ ${taskContext.getCompletedTasksSummary()}`;
         userPrompt += `
 
 \u8BF7\u57FA\u4E8E\u5DF2\u5B8C\u6210\u7684\u5DE5\u4F5C\uFF0C\u751F\u6210\u6EE1\u8DB3\u539F\u59CB\u8BF7\u6C42\u7684\u6700\u7EC8\u3001\u5B8C\u6574\u4EA7\u7269\u3002`;
-        const artifact = await this.llmRequest(userPrompt);
+        MainPanel2.update({ command: "showArtifact", artifact: "" });
+        const onStreamChunk = (chunk) => {
+          MainPanel2.update({ command: "artifactStreamChunk", chunk });
+        };
+        const artifact = await this.llmRequest(userPrompt, false, onStreamChunk);
         return artifact;
       }
     };
@@ -978,103 +1121,6 @@ var require_reflectorAgent = __commonJS({
   }
 });
 
-// src/ui/mainPanel.js
-var require_mainPanel = __commonJS({
-  "src/ui/mainPanel.js"(exports2, module2) {
-    "use strict";
-    var vscode2 = require("vscode");
-    var path2 = require("path");
-    var fs2 = require("fs");
-    var MainPanel2 = class _MainPanel {
-      static currentPanel = void 0;
-      static viewType = "multiAgentStatus";
-      static createOrShow(extensionPath) {
-        const column = vscode2.window.activeTextEditor ? vscode2.window.activeTextEditor.viewColumn : void 0;
-        if (_MainPanel.currentPanel) {
-          _MainPanel.currentPanel.panel.reveal(column);
-          return;
-        }
-        const panel = vscode2.window.createWebviewPanel(
-          _MainPanel.viewType,
-          "Multi-Agent Status",
-          column || vscode2.ViewColumn.Two,
-          {
-            enableScripts: true,
-            localResourceRoots: [vscode2.Uri.file(path2.join(extensionPath, "dist", "assets"))]
-          }
-        );
-        _MainPanel.currentPanel = new _MainPanel(panel, extensionPath);
-      }
-      static update(message) {
-        if (_MainPanel.currentPanel) {
-          _MainPanel.currentPanel.panel.webview.postMessage(message);
-        }
-      }
-      constructor(panel, extensionPath) {
-        this.panel = panel;
-        this.extensionPath = extensionPath;
-        this.panel.webview.html = this._getHtmlForWebview();
-        this.panel.webview.onDidReceiveMessage(
-          async (message) => {
-            switch (message.command) {
-              case "getSettings":
-                this.sendSettingsToWebview();
-                return;
-              case "saveSettings":
-                await this.saveSettings(message.settings);
-                return;
-            }
-          },
-          null,
-          []
-        );
-        this.panel.onDidDispose(() => this.dispose(), null, []);
-      }
-      sendSettingsToWebview() {
-        const config = vscode2.workspace.getConfiguration("multiAgent");
-        this.panel.webview.postMessage({
-          command: "receiveSettings",
-          settings: {
-            models: config.get("models", []),
-            roleAssignments: config.get("roleAssignments", {}),
-            enableSmartScan: config.get("enableSmartScan", false),
-            enableParallelExec: config.get("enableParallelExec", false),
-            enableAutoMode: config.get("enableAutoMode", false),
-            enablePersistence: config.get("enablePersistence", false)
-          }
-        });
-      }
-      async saveSettings(settings) {
-        const config = vscode2.workspace.getConfiguration("multiAgent");
-        await config.update("models", settings.models, vscode2.ConfigurationTarget.Workspace);
-        await config.update("roleAssignments", settings.roleAssignments, vscode2.ConfigurationTarget.Workspace);
-        await config.update("enableSmartScan", settings.enableSmartScan, vscode2.ConfigurationTarget.Workspace);
-        await config.update("enableParallelExec", settings.enableParallelExec, vscode2.ConfigurationTarget.Workspace);
-        await config.update("enableAutoMode", settings.enableAutoMode, vscode2.ConfigurationTarget.Workspace);
-        await config.update("enablePersistence", settings.enablePersistence, vscode2.ConfigurationTarget.Workspace);
-      }
-      dispose() {
-        _MainPanel.currentPanel = void 0;
-        this.panel.dispose();
-      }
-      _getHtmlForWebview() {
-        const assetsPath = path2.join(this.extensionPath, "dist", "assets");
-        const htmlPath = path2.join(assetsPath, "index.html");
-        let htmlContent = fs2.readFileSync(htmlPath, "utf8");
-        htmlContent = htmlContent.replace(/(href|src)="([^"]+)"/g, (match, p1, p2) => {
-          const assetUri = vscode2.Uri.file(path2.join(assetsPath, p2));
-          const webviewUri = this.panel.webview.asWebviewUri(assetUri);
-          return `${p1}="${webviewUri}"`;
-        });
-        return htmlContent;
-      }
-    };
-    module2.exports = {
-      MainPanel: MainPanel2
-    };
-  }
-});
-
 // src/extension.js
 var vscode = require("vscode");
 var fs = require("fs").promises;
@@ -1090,6 +1136,7 @@ var { EvaluatorAgent } = require_evaluatorAgent();
 var { CritiqueAggregationAgent } = require_critiqueAggregationAgent();
 var { CodebaseScannerAgent } = require_codebaseScannerAgent();
 var { ReflectorAgent } = require_reflectorAgent();
+var EventEmitter = require("events");
 var { MainPanel } = require_mainPanel();
 async function scanProject(scannerAgent, enableSmartScan) {
   const message = enableSmartScan ? "\u6B63\u5728\u5FEB\u901F\u626B\u63CF\u9879\u76EE\u7ED3\u6784..." : "\u6B63\u5728\u6DF1\u5EA6\u626B\u63CF\u9879\u76EE\u4EE3\u7801\u5E93...";
@@ -1175,10 +1222,11 @@ function activate(context) {
     vscode.window.showInformationMessage("\u6B22\u8FCE\u4F7F\u7528\u591A\u667A\u80FD\u4F53\u52A9\u624B\uFF01\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u914D\u7F6E\u60A8\u7684AI\u6A21\u578B\u4EE5\u5F00\u59CB\u4F7F\u7528\u3002");
     context.globalState.update(a_key, true);
   }
+  const taskEventEmitter = new EventEmitter();
   let disposable = vscode.commands.registerCommand("multi-agent-helper.startTask", async () => {
     try {
       logger.createLogChannel();
-      MainPanel.createOrShow(context.extensionPath);
+      MainPanel.createOrShow(context.extensionPath, taskEventEmitter);
       const config = vscode.workspace.getConfiguration("multiAgent");
       const enablePersistence = config.get("enablePersistence", false);
       let taskContext = null;
@@ -1226,6 +1274,21 @@ function activate(context) {
 ${error.stack}`);
     }
   });
+  async function awaitPlanApproval(initialPlan) {
+    if (vscode.workspace.getConfiguration("multiAgent").get("enableAutoMode", false)) {
+      MainPanel.update({ command: "log", text: "\u81EA\u52A8\u6A21\u5F0F\u5DF2\u542F\u7528\uFF0C\u81EA\u52A8\u6279\u51C6\u8BA1\u5212\u3002" });
+      return initialPlan;
+    }
+    MainPanel.update({ command: "showPlanForReview", plan: initialPlan });
+    return new Promise((resolve, reject) => {
+      taskEventEmitter.once("planApproved", (newPlan) => {
+        resolve(newPlan);
+      });
+      taskEventEmitter.once("planCancelled", () => {
+        reject(new Error("\u4EFB\u52A1\u88AB\u7528\u6237\u53D6\u6D88\u3002"));
+      });
+    });
+  }
   async function runTaskExecution(taskContext, config) {
     const enablePersistence = config.get("enablePersistence", false);
     const scannerAgent = new CodebaseScannerAgent(getModelsForRole("codebaseScanner")[0]);
@@ -1300,8 +1363,9 @@ ${workerResult.args.command}
     for (let i = taskContext.currentIteration - 1; i < MAX_ITERATIONS; i++) {
       MainPanel.update({ command: "log", text: `--- \u7B2C ${taskContext.currentIteration} \u8F6E\u8FED\u4EE3 ---` });
       if (taskContext.subTasks.every((t) => t.status !== "pending" && t.status !== "in_progress")) {
-        const plan = await orchestrator.executeTask(taskContext);
-        taskContext.setNewPlanForIteration(plan);
+        const initialPlan = await orchestrator.executeTask(taskContext);
+        const approvedPlan = await awaitPlanApproval(initialPlan);
+        taskContext.setNewPlanForIteration(approvedPlan);
         MainPanel.update({ command: "updatePlan", plan: taskContext.subTasks });
         if (enablePersistence) await saveTaskState(taskContext);
       }
@@ -1334,6 +1398,7 @@ ${workerResult.args.command}
       MainPanel.update({ command: "log", text: "\u672C\u8F6E\u6240\u6709\u4EFB\u52A1\u5DF2\u6267\u884C\u5B8C\u6BD5\u3002" });
       const artifact = await synthesizer.executeTask(taskContext);
       MainPanel.update({ command: "showArtifact", artifact });
+      MainPanel.update({ command: "highlightArtifact" });
       const evaluationPromises = evaluationTeamConfigs.map((config2) => {
         const evaluator = new EvaluatorAgent(config2);
         return evaluator.executeTask(artifact, taskContext);

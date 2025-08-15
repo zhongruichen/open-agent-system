@@ -15,12 +15,12 @@ class OpenAICompatibleProvider {
      * Makes a chat completion request.
      * @param {Array<object>} messages The array of message objects.
      * @param {boolean} [jsonMode=false] Whether to enable JSON mode.
-     * @returns {Promise<string>} The content of the assistant's response.
+     * @param {(chunk: string) => void} [onStreamChunk=null] A callback for handling streaming chunks.
+     * @returns {Promise<string>} The full content of the assistant's response.
      */
-    async chatCompletion(messages, jsonMode = false) {
+    async chatCompletion(messages, jsonMode = false, onStreamChunk = null) {
         const { apiKey, baseUrl, modelName } = this.modelConfig;
 
-        // Determine the correct API endpoint URL
         const url = new URL(baseUrl || 'https://api.openai.com');
         url.pathname = url.pathname.replace(/\/v1\/?$/, '') + '/v1/chat/completions';
 
@@ -31,6 +31,11 @@ class OpenAICompatibleProvider {
 
         if (jsonMode) {
             requestBody.response_format = { type: 'json_object' };
+        }
+
+        const useStream = !!onStreamChunk;
+        if (useStream) {
+            requestBody.stream = true;
         }
 
         const options = {
@@ -46,14 +51,50 @@ class OpenAICompatibleProvider {
 
         return new Promise((resolve, reject) => {
             const req = https.request(options, (res) => {
-                let data = '';
+                let fullContent = '';
+
+                if (res.statusCode < 200 || res.statusCode >= 300) {
+                    let errorData = '';
+                    res.on('data', chunk => errorData += chunk);
+                    res.on('end', () => reject(new Error(`API request failed with status ${res.statusCode}: ${errorData}`)));
+                    return;
+                }
+
                 res.on('data', (chunk) => {
-                    data += chunk;
+                    const chunkStr = chunk.toString();
+                    if (useStream) {
+                        // Process Server-Sent Events (SSE)
+                        const lines = chunkStr.split('\n').filter(line => line.trim() !== '');
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const dataStr = line.substring(6);
+                                if (dataStr === '[DONE]') {
+                                    // Stream finished
+                                    return;
+                                }
+                                try {
+                                    const data = JSON.parse(dataStr);
+                                    const deltaContent = data.choices[0]?.delta?.content;
+                                    if (deltaContent) {
+                                        fullContent += deltaContent;
+                                        onStreamChunk(deltaContent);
+                                    }
+                                } catch (e) {
+                                    // Ignore parsing errors for non-JSON chunks
+                                }
+                            }
+                        }
+                    } else {
+                        fullContent += chunkStr;
+                    }
                 });
+
                 res.on('end', () => {
-                    if (res.statusCode >= 200 && res.statusCode < 300) {
+                    if (useStream) {
+                        resolve(fullContent);
+                    } else {
                         try {
-                            const responseJson = JSON.parse(data);
+                            const responseJson = JSON.parse(fullContent);
                             const content = responseJson.choices[0]?.message?.content;
                             if (content) {
                                 resolve(content);
@@ -63,8 +104,6 @@ class OpenAICompatibleProvider {
                         } catch (e) {
                             reject(new Error(`Failed to parse API response: ${e.message}`));
                         }
-                    } else {
-                        reject(new Error(`API request failed with status ${res.statusCode}: ${data}`));
                     }
                 });
             });

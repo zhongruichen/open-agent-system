@@ -23,14 +23,14 @@ class BaseAgent {
      * @param {boolean} [jsonMode=false] Whether to request a JSON response from the LLM.
      * @returns {Promise<string>} The text content of the LLM's response.
      */
-    async llmRequest(userPrompt, jsonMode = false) {
+    async llmRequest(userPrompt, jsonMode = false, onStreamChunk = null) {
         const messages = [
             { role: 'system', content: this.systemPrompt },
             { role: 'user', content: userPrompt }
         ];
         // In a real scenario, you might add more complex history management here.
 
-        return this.provider.chatCompletion(messages, jsonMode);
+        return this.provider.chatCompletion(messages, jsonMode, onStreamChunk);
     }
 
     /**
