@@ -47,8 +47,42 @@ class MainPanel {
         // Set the webview's initial html content
         this.panel.webview.html = this._getHtmlForWebview();
 
+        // Listen for messages from the webview
+        this.panel.webview.onDidReceiveMessage(
+            async message => {
+                switch (message.command) {
+                    case 'getSettings':
+                        this.sendSettingsToWebview();
+                        return;
+                    case 'saveSettings':
+                        await this.saveSettings(message.settings);
+                        // Optional: Send a confirmation back to the webview
+                        return;
+                }
+            },
+            null,
+            []
+        );
+
         // Listen for when the panel is disposed
         this.panel.onDidDispose(() => this.dispose(), null, []);
+    }
+
+    sendSettingsToWebview() {
+        const config = vscode.workspace.getConfiguration('multiAgent');
+        const models = config.get('models', []);
+        const roleAssignments = config.get('roleAssignments', {});
+        this.panel.webview.postMessage({
+            command: 'receiveSettings',
+            settings: { models, roleAssignments }
+        });
+    }
+
+    async saveSettings(settings) {
+        const config = vscode.workspace.getConfiguration('multiAgent');
+        // Update settings in VS Code configuration
+        await config.update('models', settings.models, vscode.ConfigurationTarget.Workspace);
+        await config.update('roleAssignments', settings.roleAssignments, vscode.ConfigurationTarget.Workspace);
     }
 
     dispose() {

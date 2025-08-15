@@ -892,7 +892,35 @@ var require_mainPanel = __commonJS({
         this.panel = panel;
         this.extensionPath = extensionPath;
         this.panel.webview.html = this._getHtmlForWebview();
+        this.panel.webview.onDidReceiveMessage(
+          async (message) => {
+            switch (message.command) {
+              case "getSettings":
+                this.sendSettingsToWebview();
+                return;
+              case "saveSettings":
+                await this.saveSettings(message.settings);
+                return;
+            }
+          },
+          null,
+          []
+        );
         this.panel.onDidDispose(() => this.dispose(), null, []);
+      }
+      sendSettingsToWebview() {
+        const config = vscode2.workspace.getConfiguration("multiAgent");
+        const models = config.get("models", []);
+        const roleAssignments = config.get("roleAssignments", {});
+        this.panel.webview.postMessage({
+          command: "receiveSettings",
+          settings: { models, roleAssignments }
+        });
+      }
+      async saveSettings(settings) {
+        const config = vscode2.workspace.getConfiguration("multiAgent");
+        await config.update("models", settings.models, vscode2.ConfigurationTarget.Workspace);
+        await config.update("roleAssignments", settings.roleAssignments, vscode2.ConfigurationTarget.Workspace);
       }
       dispose() {
         _MainPanel.currentPanel = void 0;
