@@ -70,17 +70,19 @@ class MainPanel {
     }
 
     sendSettingsToWebview() {
+        const { toolRegistry } = require('../tools/toolRegistry.js');
         const config = vscode.workspace.getConfiguration('multiAgent');
         this.panel.webview.postMessage({
             command: 'receiveSettings',
             settings: {
                 models: config.get('models', []),
-                roleAssignments: config.get('roleAssignments', {}),
+                roles: config.get('roles', []),
                 enableSmartScan: config.get('enableSmartScan', false),
                 enableParallelExec: config.get('enableParallelExec', false),
                 enableAutoMode: config.get('enableAutoMode', false),
                 enablePersistence: config.get('enablePersistence', false)
-            }
+            },
+            allTools: Object.keys(toolRegistry)
         });
     }
 

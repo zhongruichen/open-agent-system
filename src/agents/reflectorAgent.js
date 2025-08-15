@@ -24,8 +24,9 @@ const SYSTEM_PROMPT = `你是一个“反思者”智能体。你的工作是诊
 不要添加任何额外的解释。只输出JSON对象。`;
 
 class ReflectorAgent extends BaseAgent {
-    constructor(modelConfig) {
-        super(modelConfig, SYSTEM_PROMPT);
+    constructor(modelConfig, systemPrompt) {
+        const defaultPrompt = SYSTEM_PROMPT;
+        super(modelConfig, systemPrompt || defaultPrompt);
     }
 
     /**

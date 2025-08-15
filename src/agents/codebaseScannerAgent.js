@@ -9,8 +9,9 @@ const SYSTEM_PROMPT = `你是一个“代码库扫描员”智能体。你唯一
 你必须只输出这句总结。不要添加任何其他文本或解释。`;
 
 class CodebaseScannerAgent extends BaseAgent {
-    constructor(modelConfig) {
-        super(modelConfig, SYSTEM_PROMPT);
+    constructor(modelConfig, systemPrompt) {
+        const defaultPrompt = SYSTEM_PROMPT;
+        super(modelConfig, systemPrompt || defaultPrompt);
     }
 
     /**

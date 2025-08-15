@@ -34,8 +34,9 @@ const SYSTEM_PROMPT = `你是一个“工人”智能体。你的工作是执行
 }`;
 
 class WorkerAgent extends BaseAgent {
-    constructor(modelConfig) {
-        super(modelConfig, SYSTEM_PROMPT);
+    constructor(modelConfig, systemPrompt) {
+        const defaultPrompt = SYSTEM_PROMPT;
+        super(modelConfig, systemPrompt || defaultPrompt);
     }
 
     /**

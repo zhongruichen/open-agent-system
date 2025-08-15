@@ -16,18 +16,16 @@
         <button class="tab-button" data-tab="settings">设置</button>
     </div>
 
+    <!-- Status Tab Content -->
     <div id="status" class="tab-content active">
         <div class="container">
-            <div class="section">
+             <div class="section">
                 <h2>总体目标</h2>
                 <p id="overall-goal">等待任务开始...</p>
             </div>
-
             <div class="section">
                 <h2>当前计划</h2>
-                <ul id="plan-list">
-                    <!-- 计划步骤将在此处动态插入 -->
-                </ul>
+                <ul id="plan-list"></ul>
                 <div id="plan-review-container" style="display: none;">
                     <h3>请审核并批准计划</h3>
                     <div id="editable-plan-list"></div>
@@ -37,69 +35,29 @@
                     </div>
                 </div>
             </div>
-
             <div class="section">
                 <h2>执行日志</h2>
-                <div id="execution-log" class="log-box">
-                    <!-- 日志消息将在此处动态插入 -->
-                </div>
+                <div id="execution-log" class="log-box"></div>
             </div>
-
             <div class="section">
                 <h2>最终产物</h2>
-                <pre id="final-artifact" class="code-box">
-                    <code><!-- 最终代码/产物将在此处显示 --></code>
-                </pre>
+                <pre id="final-artifact" class="code-box"><code></code></pre>
             </div>
         </div>
     </div>
 
+    <!-- Settings Tab Content -->
     <div id="settings" class="tab-content">
         <div class="container">
             <h2>模型配置</h2>
-            <div id="models-list">
-                <!-- 模型列表将在此处动态生成 -->
-            </div>
+            <div id="models-list"></div>
             <button id="add-model-btn" class="button">添加新模型</button>
         </div>
 
-        <div id="model-editor" class="container" style="display: none;">
-            <h3 id="editor-title">添加模型</h3>
-            <form id="model-form">
-                <input type="hidden" id="model-id" value="">
-
-                <label for="model-name">名称:</label>
-                <input type="text" id="model-name" required>
-
-                <label for="model-provider">供应商:</label>
-                <select id="model-provider" required>
-                    <option value="OpenAI">OpenAI</option>
-                    <option value="Anthropic">Anthropic</option>
-                    <option value="Google">Google</option>
-                    <option value="Custom">Custom</option>
-                </select>
-
-                <label for="model-modelName">模型名称 (e.g., gpt-4-turbo):</label>
-                <input type="text" id="model-modelName" required>
-
-                <label for="model-apiKey">API Key:</label>
-                <input type="password" id="model-apiKey" required>
-
-                <label for="model-baseUrl">Base URL (可选):</label>
-                <input type="text" id="model-baseUrl">
-
-                <div class="form-buttons">
-                    <button type="submit" class="button-primary">保存模型</button>
-                    <button type="button" id="cancel-edit-btn" class="button">取消</button>
-                </div>
-            </form>
-        </div>
-
-        <div class="container">
-            <h2>角色分配</h2>
-            <div id="role-assignments">
-                <!-- 角色分配将在此处动态生成 -->
-            </div>
+        <div id="roles-container" class="container">
+            <h2>角色配置</h2>
+            <div id="roles-list"></div>
+            <button id="add-role-btn" class="button">添加新角色</button>
         </div>
 
         <div class="container">
@@ -126,6 +84,24 @@
 
         <button id="save-settings-btn" class="button-primary">保存所有设置</button>
     </div>
+
+    <!-- Editor Modal (repurposed for both models and roles) -->
+    <div id="editor-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="editor-title">编辑器</h3>
+            <div id="model-editor-fields">
+                <!-- Model fields will be injected by JS -->
+            </div>
+            <div id="role-editor-fields">
+                <!-- Role fields will be injected by JS -->
+            </div>
+            <div class="form-buttons">
+                <button id="save-editor-btn" class="button-primary">保存</button>
+                <button id="cancel-editor-btn" class="button">取消</button>
+            </div>
+        </div>
+    </div>
+
 
     <script src="main.js"></script>
 </body>

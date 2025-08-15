@@ -61,7 +61,35 @@ async function scanProject(scannerAgent, enableSmartScan) {
 }
 
 
+async function migrateSettings(config) {
+    const oldAssignments = config.get('roleAssignments');
+    if (oldAssignments && Object.keys(oldAssignments).length > 0) {
+        MainPanel.update({ command: 'log', text: '检测到旧版角色配置，正在迁移...' });
+        const defaultRoles = config.inspect('roles').defaultValue;
+        const newRoles = defaultRoles.map(role => {
+            const oldRoleName = role.name.charAt(0).toLowerCase() + role.name.slice(1);
+            const assignedModel = oldAssignments[oldRoleName];
+            if (assignedModel) {
+                return { ...role, model: assignedModel };
+            }
+            // Special handling for evaluationTeam array
+            if (role.name === 'Evaluator' && Array.isArray(oldAssignments.evaluationTeam) && oldAssignments.evaluationTeam.length > 0) {
+                 return { ...role, model: oldAssignments.evaluationTeam[0] };
+            }
+            return role;
+        });
+
+        await config.update('roles', newRoles, vscode.ConfigurationTarget.Global);
+        // Unset the old setting to prevent re-migration
+        await config.update('roleAssignments', undefined, vscode.ConfigurationTarget.Global);
+        MainPanel.update({ command: 'log', text: '配置迁移完成。' });
+    }
+}
+
+
 function activate(context) {
+    // Run migration once on activation
+    migrateSettings(vscode.workspace.getConfiguration('multiAgent'));
 
     const stateFilePath = path.join(context.globalStoragePath, 'activeTaskState.json');
 
@@ -150,12 +178,13 @@ function activate(context) {
                 taskContext = new TaskContext(userRequest);
 
                 const enableSmartScan = config.get('enableSmartScan', false);
-                const scannerConfigs = getModelsForRole('codebaseScanner');
-                if (!scannerConfigs) {
-                    vscode.window.showErrorMessage("代码库扫描员的模型配置缺失。");
+                const { getModelForRole, getRoleProfile } = require('./config');
+                const scannerProfile = getRoleProfile('CodebaseScanner');
+                if (!scannerProfile || !scannerProfile.model) {
+                     vscode.window.showErrorMessage("代码库扫描员(CodebaseScanner)角色或其模型未配置。");
                     return;
                 }
-                const scannerAgent = new CodebaseScannerAgent(scannerConfigs[0]);
+                const scannerAgent = new CodebaseScannerAgent(getModelForRole('CodebaseScanner'), scannerProfile.systemPrompt);
                 taskContext.projectContext = await scanProject(scannerAgent, enableSmartScan);
             }
 
@@ -191,16 +220,24 @@ function activate(context) {
         // This function now contains the main loop for task execution.
         const enablePersistence = config.get('enablePersistence', false);
 
-        // Initialize agents
-        const scannerAgent = new CodebaseScannerAgent(getModelsForRole('codebaseScanner')[0]);
-        const orchestrator = new OrchestratorAgent(getModelsForRole('orchestrator')[0]);
-        const worker = new WorkerAgent(getModelsForRole('worker')[0]);
-        const synthesizer = new SynthesizerAgent(getModelsForRole('synthesizer')[0]);
-        const critiqueAggregator = new CritiqueAggregationAgent(getModelsForRole('critiqueAggregator')[0]);
-        const evaluationTeamConfigs = getModelsForRole('evaluationTeam');
+        // Initialize agents based on role profiles
+        const { getModelForRole, getModelsForTeam, getRoleProfile } = require('./config');
 
-        const reflectorConfig = getModelsForRole('reflector');
-        const reflectorAgent = reflectorConfig ? new ReflectorAgent(reflectorConfig[0]) : null;
+        const orchestratorProfile = getRoleProfile('Orchestrator');
+        const workerProfile = getRoleProfile('Worker');
+        const synthesizerProfile = getRoleProfile('Synthesizer');
+        const critiqueAggregatorProfile = getRoleProfile('CritiqueAggregator');
+        const scannerProfile = getRoleProfile('CodebaseScanner');
+        const reflectorProfile = getRoleProfile('Reflector');
+        const evaluatorProfile = getRoleProfile('Evaluator');
+
+        const orchestrator = new OrchestratorAgent(getModelForRole('Orchestrator'), orchestratorProfile.systemPrompt);
+        const worker = new WorkerAgent(getModelForRole('Worker'), workerProfile.systemPrompt);
+        const synthesizer = new SynthesizerAgent(getModelForRole('Synthesizer'), synthesizerProfile.systemPrompt);
+        const critiqueAggregator = new CritiqueAggregationAgent(getModelForRole('CritiqueAggregator'), critiqueAggregatorProfile.systemPrompt);
+        const scannerAgent = new CodebaseScannerAgent(getModelForRole('CodebaseScanner'), scannerProfile.systemPrompt);
+        const reflectorAgent = reflectorProfile ? new ReflectorAgent(getModelForRole('Reflector'), reflectorProfile.systemPrompt) : null;
+        const evaluationTeamConfigs = getModelsForTeam('Evaluator'); // Special handling for teams
 
 
         // This function encapsulates the logic for executing a single task.
@@ -223,7 +260,8 @@ function activate(context) {
                         );
                         if (userApproval !== "批准") throw new Error("用户拒绝了终端命令的执行。");
                     }
-                    const toolResult = await executeTool(workerResult.toolName, workerResult.args, logger, scannerAgent);
+                    const toolContext = { scannerAgent, workerProfile };
+                    const toolResult = await executeTool(workerResult.toolName, workerResult.args, logger, toolContext);
                     taskContext.updateTaskStatus(subTask.id, 'completed', toolResult);
                     MainPanel.update({ command: 'log', text: `任务 ${subTask.id} 成功完成。` });
                     lastError = '';

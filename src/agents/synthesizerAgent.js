@@ -9,8 +9,9 @@ const SYSTEM_PROMPT = `你是一个“整合者”智能体。你的职责是接
 请分析已完成的任务，并生成一个能够满足用户原始请求的、单一的、最终的输出。`;
 
 class SynthesizerAgent extends BaseAgent {
-    constructor(modelConfig) {
-        super(modelConfig, SYSTEM_PROMPT);
+    constructor(modelConfig, systemPrompt) {
+        const defaultPrompt = SYSTEM_PROMPT;
+        super(modelConfig, systemPrompt || defaultPrompt);
     }
 
     /**

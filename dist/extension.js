@@ -12,38 +12,36 @@ var require_config = __commonJS({
     function getModelConfigs() {
       return vscode2.workspace.getConfiguration("multiAgent").get("models", []);
     }
-    function getRoleAssignments() {
-      return vscode2.workspace.getConfiguration("multiAgent").get("roleAssignments", {});
+    function getRoleProfiles() {
+      return vscode2.workspace.getConfiguration("multiAgent").get("roles", []);
     }
-    function getModelsForRole2(role) {
-      const assignments = getRoleAssignments();
+    function getRoleProfile(roleName) {
+      const roles = getRoleProfiles();
+      return roles.find((r) => r.name.toLowerCase() === roleName.toLowerCase());
+    }
+    function getModelForRole(roleName) {
       const allModels = getModelConfigs();
       if (allModels.length === 0) {
         return null;
       }
-      let modelNames = assignments[role];
-      if (role === "evaluationTeam" && (!modelNames || modelNames.length === 0)) {
-        const oldEvaluator = assignments["evaluator"];
-        if (oldEvaluator) {
-          console.warn("Using deprecated 'evaluator' role assignment. Please migrate to 'evaluationTeam'.");
-          modelNames = [oldEvaluator];
-        }
+      const roleProfile = getRoleProfile(roleName);
+      if (!roleProfile || !roleProfile.model) {
+        return JSON.parse(JSON.stringify(allModels[0]));
       }
-      if (!modelNames || modelNames.length === 0) {
-        return [JSON.parse(JSON.stringify(allModels[0]))];
+      const model = allModels.find((m) => m.name === roleProfile.model);
+      if (model) {
+        return JSON.parse(JSON.stringify(model));
       }
-      const modelNamesArray = Array.isArray(modelNames) ? modelNames : [modelNames];
-      const models = modelNamesArray.map((name) => {
-        const model = allModels.find((m) => m.name === name);
-        return model ? JSON.parse(JSON.stringify(model)) : null;
-      }).filter(Boolean);
-      if (models.length > 0) {
-        return models;
-      }
-      return [JSON.parse(JSON.stringify(allModels[0]))];
+      return JSON.parse(JSON.stringify(allModels[0]));
+    }
+    function getModelsForTeam(teamName = "Evaluator") {
+      const model = getModelForRole(teamName);
+      return model ? [model] : [];
     }
     module2.exports = {
-      getModelsForRole: getModelsForRole2
+      getModelForRole,
+      getModelsForTeam,
+      getRoleProfile
     };
   }
 });
@@ -237,11 +235,16 @@ var require_toolRegistry = __commonJS({
       "terminal.executeCommand": executeCommand,
       "webSearch.search": search
     };
-    async function executeTool2(toolName, args, logger2, scannerAgent) {
+    async function executeTool2(toolName, args, logger2, { scannerAgent, workerProfile }) {
       logger2.logLine(`
 --- Tool Call ---`);
       logger2.logLine(`Tool: ${toolName}`);
       logger2.logLine(`Arguments: ${JSON.stringify(args)}`);
+      if (!workerProfile.allowedTools.includes(toolName)) {
+        const errorMsg = `Error: Agent role "Worker" is not authorized to use tool "${toolName}".`;
+        logger2.logLine(errorMsg);
+        throw new Error(errorMsg);
+      }
       const toolFunction = toolRegistry[toolName];
       if (!toolFunction) {
         const errorMsg = `Error: Tool "${toolName}" not found.`;
@@ -275,7 +278,7 @@ var require_toolRegistry = __commonJS({
         throw new Error(errorMsg);
       }
     }
-    module2.exports = { executeTool: executeTool2 };
+    module2.exports = { executeTool: executeTool2, toolRegistry };
   }
 });
 
@@ -581,8 +584,9 @@ var require_orchestratorAgent = __commonJS({
   ]
 }`;
     var OrchestratorAgent2 = class extends BaseAgent {
-      constructor(modelConfig) {
-        super(modelConfig, SYSTEM_PROMPT);
+      constructor(modelConfig, systemPrompt) {
+        const defaultPrompt = SYSTEM_PROMPT;
+        super(modelConfig, systemPrompt || defaultPrompt);
       }
       /**
        * Creates a plan to fulfill the user's request.
@@ -679,8 +683,9 @@ var require_workerAgent = __commonJS({
   }
 }`;
     var WorkerAgent2 = class extends BaseAgent {
-      constructor(modelConfig) {
-        super(modelConfig, SYSTEM_PROMPT);
+      constructor(modelConfig, systemPrompt) {
+        const defaultPrompt = SYSTEM_PROMPT;
+        super(modelConfig, systemPrompt || defaultPrompt);
       }
       /**
        * Executes a single sub-task.
@@ -787,17 +792,19 @@ var require_mainPanel = __commonJS({
         this.panel.onDidDispose(() => this.dispose(), null, []);
       }
       sendSettingsToWebview() {
+        const { toolRegistry } = require_toolRegistry();
         const config = vscode2.workspace.getConfiguration("multiAgent");
         this.panel.webview.postMessage({
           command: "receiveSettings",
           settings: {
             models: config.get("models", []),
-            roleAssignments: config.get("roleAssignments", {}),
+            roles: config.get("roles", []),
             enableSmartScan: config.get("enableSmartScan", false),
             enableParallelExec: config.get("enableParallelExec", false),
             enableAutoMode: config.get("enableAutoMode", false),
             enablePersistence: config.get("enablePersistence", false)
-          }
+          },
+          allTools: Object.keys(toolRegistry)
         });
       }
       async saveSettings(settings) {
@@ -845,8 +852,9 @@ var require_synthesizerAgent = __commonJS({
 \u4F8B\u5982\uFF0C\u5982\u679C\u5DE5\u4EBA\u521B\u5EFA\u4E86\u4E00\u4E2A\u6587\u4EF6\u7136\u540E\u6267\u884C\u4E86\u5B83\uFF0C\u90A3\u4E48\u6700\u7EC8\u7684\u4EA7\u7269\u5F88\u53EF\u80FD\u5C31\u662F\u88AB\u521B\u5EFA\u7684\u6587\u4EF6\u7684\u5185\u5BB9\u3002
 \u8BF7\u5206\u6790\u5DF2\u5B8C\u6210\u7684\u4EFB\u52A1\uFF0C\u5E76\u751F\u6210\u4E00\u4E2A\u80FD\u591F\u6EE1\u8DB3\u7528\u6237\u539F\u59CB\u8BF7\u6C42\u7684\u3001\u5355\u4E00\u7684\u3001\u6700\u7EC8\u7684\u8F93\u51FA\u3002`;
     var SynthesizerAgent2 = class extends BaseAgent {
-      constructor(modelConfig) {
-        super(modelConfig, SYSTEM_PROMPT);
+      constructor(modelConfig, systemPrompt) {
+        const defaultPrompt = SYSTEM_PROMPT;
+        super(modelConfig, systemPrompt || defaultPrompt);
       }
       /**
        * Generates the final artifact based on the completed tasks.
@@ -898,8 +906,9 @@ var require_evaluatorAgent = __commonJS({
   ]
 }`;
     var EvaluatorAgent2 = class extends BaseAgent {
-      constructor(modelConfig) {
-        super(modelConfig, SYSTEM_PROMPT);
+      constructor(modelConfig, systemPrompt) {
+        const defaultPrompt = SYSTEM_PROMPT;
+        super(modelConfig, systemPrompt || defaultPrompt);
       }
       /**
        * Evaluates the given artifact.
@@ -964,8 +973,9 @@ var require_critiqueAggregationAgent = __commonJS({
 
 \u4E0D\u8981\u6DFB\u52A0\u4EFB\u4F55\u89E3\u91CA\u3002\u53EA\u8F93\u51FAJSON\u5BF9\u8C61\u3002`;
     var CritiqueAggregationAgent2 = class extends BaseAgent {
-      constructor(modelConfig) {
-        super(modelConfig, SYSTEM_PROMPT);
+      constructor(modelConfig, systemPrompt) {
+        const defaultPrompt = SYSTEM_PROMPT;
+        super(modelConfig, systemPrompt || defaultPrompt);
       }
       /**
        * Aggregates multiple evaluations into a single critique.
@@ -1023,8 +1033,9 @@ var require_codebaseScannerAgent = __commonJS({
 
 \u4F60\u5FC5\u987B\u53EA\u8F93\u51FA\u8FD9\u53E5\u603B\u7ED3\u3002\u4E0D\u8981\u6DFB\u52A0\u4EFB\u4F55\u5176\u4ED6\u6587\u672C\u6216\u89E3\u91CA\u3002`;
     var CodebaseScannerAgent2 = class extends BaseAgent {
-      constructor(modelConfig) {
-        super(modelConfig, SYSTEM_PROMPT);
+      constructor(modelConfig, systemPrompt) {
+        const defaultPrompt = SYSTEM_PROMPT;
+        super(modelConfig, systemPrompt || defaultPrompt);
       }
       /**
        * Summarizes the purpose of a file based on its content.
@@ -1077,8 +1088,9 @@ var require_reflectorAgent = __commonJS({
 
 \u4E0D\u8981\u6DFB\u52A0\u4EFB\u4F55\u989D\u5916\u7684\u89E3\u91CA\u3002\u53EA\u8F93\u51FAJSON\u5BF9\u8C61\u3002`;
     var ReflectorAgent2 = class extends BaseAgent {
-      constructor(modelConfig) {
-        super(modelConfig, SYSTEM_PROMPT);
+      constructor(modelConfig, systemPrompt) {
+        const defaultPrompt = SYSTEM_PROMPT;
+        super(modelConfig, systemPrompt || defaultPrompt);
       }
       /**
        * Analyzes a failed task and suggests a correction.
@@ -1181,7 +1193,29 @@ async function scanProject(scannerAgent, enableSmartScan) {
   MainPanel.update({ command: "log", text: "\u9879\u76EE\u626B\u63CF\u5B8C\u6210\u3002" });
   return projectContext;
 }
+async function migrateSettings(config) {
+  const oldAssignments = config.get("roleAssignments");
+  if (oldAssignments && Object.keys(oldAssignments).length > 0) {
+    MainPanel.update({ command: "log", text: "\u68C0\u6D4B\u5230\u65E7\u7248\u89D2\u8272\u914D\u7F6E\uFF0C\u6B63\u5728\u8FC1\u79FB..." });
+    const defaultRoles = config.inspect("roles").defaultValue;
+    const newRoles = defaultRoles.map((role) => {
+      const oldRoleName = role.name.charAt(0).toLowerCase() + role.name.slice(1);
+      const assignedModel = oldAssignments[oldRoleName];
+      if (assignedModel) {
+        return { ...role, model: assignedModel };
+      }
+      if (role.name === "Evaluator" && Array.isArray(oldAssignments.evaluationTeam) && oldAssignments.evaluationTeam.length > 0) {
+        return { ...role, model: oldAssignments.evaluationTeam[0] };
+      }
+      return role;
+    });
+    await config.update("roles", newRoles, vscode.ConfigurationTarget.Global);
+    await config.update("roleAssignments", void 0, vscode.ConfigurationTarget.Global);
+    MainPanel.update({ command: "log", text: "\u914D\u7F6E\u8FC1\u79FB\u5B8C\u6210\u3002" });
+  }
+}
 function activate(context) {
+  migrateSettings(vscode.workspace.getConfiguration("multiAgent"));
   const stateFilePath = path.join(context.globalStoragePath, "activeTaskState.json");
   async function saveTaskState(taskContext) {
     try {
@@ -1258,12 +1292,13 @@ function activate(context) {
         MainPanel.update({ command: "updateGoal", text: userRequest });
         taskContext = new TaskContext(userRequest);
         const enableSmartScan = config.get("enableSmartScan", false);
-        const scannerConfigs = getModelsForRole("codebaseScanner");
-        if (!scannerConfigs) {
-          vscode.window.showErrorMessage("\u4EE3\u7801\u5E93\u626B\u63CF\u5458\u7684\u6A21\u578B\u914D\u7F6E\u7F3A\u5931\u3002");
+        const { getModelForRole, getRoleProfile } = require_config();
+        const scannerProfile = getRoleProfile("CodebaseScanner");
+        if (!scannerProfile || !scannerProfile.model) {
+          vscode.window.showErrorMessage("\u4EE3\u7801\u5E93\u626B\u63CF\u5458(CodebaseScanner)\u89D2\u8272\u6216\u5176\u6A21\u578B\u672A\u914D\u7F6E\u3002");
           return;
         }
-        const scannerAgent = new CodebaseScannerAgent(scannerConfigs[0]);
+        const scannerAgent = new CodebaseScannerAgent(getModelForRole("CodebaseScanner"), scannerProfile.systemPrompt);
         taskContext.projectContext = await scanProject(scannerAgent, enableSmartScan);
       }
       await runTaskExecution(taskContext, config);
@@ -1291,14 +1326,21 @@ ${error.stack}`);
   }
   async function runTaskExecution(taskContext, config) {
     const enablePersistence = config.get("enablePersistence", false);
-    const scannerAgent = new CodebaseScannerAgent(getModelsForRole("codebaseScanner")[0]);
-    const orchestrator = new OrchestratorAgent(getModelsForRole("orchestrator")[0]);
-    const worker = new WorkerAgent(getModelsForRole("worker")[0]);
-    const synthesizer = new SynthesizerAgent(getModelsForRole("synthesizer")[0]);
-    const critiqueAggregator = new CritiqueAggregationAgent(getModelsForRole("critiqueAggregator")[0]);
-    const evaluationTeamConfigs = getModelsForRole("evaluationTeam");
-    const reflectorConfig = getModelsForRole("reflector");
-    const reflectorAgent = reflectorConfig ? new ReflectorAgent(reflectorConfig[0]) : null;
+    const { getModelForRole, getModelsForTeam, getRoleProfile } = require_config();
+    const orchestratorProfile = getRoleProfile("Orchestrator");
+    const workerProfile = getRoleProfile("Worker");
+    const synthesizerProfile = getRoleProfile("Synthesizer");
+    const critiqueAggregatorProfile = getRoleProfile("CritiqueAggregator");
+    const scannerProfile = getRoleProfile("CodebaseScanner");
+    const reflectorProfile = getRoleProfile("Reflector");
+    const evaluatorProfile = getRoleProfile("Evaluator");
+    const orchestrator = new OrchestratorAgent(getModelForRole("Orchestrator"), orchestratorProfile.systemPrompt);
+    const worker = new WorkerAgent(getModelForRole("Worker"), workerProfile.systemPrompt);
+    const synthesizer = new SynthesizerAgent(getModelForRole("Synthesizer"), synthesizerProfile.systemPrompt);
+    const critiqueAggregator = new CritiqueAggregationAgent(getModelForRole("CritiqueAggregator"), critiqueAggregatorProfile.systemPrompt);
+    const scannerAgent = new CodebaseScannerAgent(getModelForRole("CodebaseScanner"), scannerProfile.systemPrompt);
+    const reflectorAgent = reflectorProfile ? new ReflectorAgent(getModelForRole("Reflector"), reflectorProfile.systemPrompt) : null;
+    const evaluationTeamConfigs = getModelsForTeam("Evaluator");
     async function executeSingleTask(subTask) {
       taskContext.updateTaskStatus(subTask.id, "in_progress");
       MainPanel.update({ command: "updatePlan", plan: taskContext.subTasks });
@@ -1321,7 +1363,8 @@ ${workerResult.args.command}
             );
             if (userApproval !== "\u6279\u51C6") throw new Error("\u7528\u6237\u62D2\u7EDD\u4E86\u7EC8\u7AEF\u547D\u4EE4\u7684\u6267\u884C\u3002");
           }
-          const toolResult = await executeTool(workerResult.toolName, workerResult.args, logger, scannerAgent);
+          const toolContext = { scannerAgent, workerProfile };
+          const toolResult = await executeTool(workerResult.toolName, workerResult.args, logger, toolContext);
           taskContext.updateTaskStatus(subTask.id, "completed", toolResult);
           MainPanel.update({ command: "log", text: `\u4EFB\u52A1 ${subTask.id} \u6210\u529F\u5B8C\u6210\u3002` });
           lastError = "";

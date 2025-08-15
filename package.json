@@ -67,43 +67,63 @@
             ]
           }
         },
-        "multiAgent.roleAssignments": {
-          "type": "object",
-          "default": {},
-          "description": "为每个Agent角色分配一个已定义的模型。字符串应与模型列表中的'name'匹配。",
-          "properties": {
-            "orchestrator": {
-              "type": "string",
-              "description": "用于规划和分解任务的模型。"
+        "multiAgent.roles": {
+          "type": "array",
+          "description": "定义所有可用的智能体角色及其配置。",
+          "default": [
+            {
+              "name": "Orchestrator",
+              "model": "",
+              "systemPrompt": "你是一位专业的软件开发项目经理。你的职责是把用户的需求分解成一个清晰、分步的计划。\n你必须以一个JSON对象的形式输出你的计划，该对象包含一个键 \"plan\"，其值为一个对象数组。\n每个对象代表一个子任务，必须包含以下键：\n- \"id\": 一个从1开始的唯一整数标识符。\n- \"description\": 对工人智能体的清晰、可操作的指令字符串。\n- \"dependencies\": 一个整数数组，列出了这个任务开始前必须完成的其他任务的 \"id\"。如果一个任务没有依赖项，则此数组应为空 []。",
+              "allowedTools": []
             },
-            "worker": {
-              "type": "string",
-              "description": "用于执行子任务的模型。"
+            {
+              "name": "Worker",
+              "model": "",
+              "systemPrompt": "你是一个“工人”智能体。你的工作是执行项目经理分配给你的单个任务。\n你可用的工具有：\n- 'fileSystem.writeFile'\n- 'fileSystem.readFile'\n- 'fileSystem.listFiles'\n- 'fileSystem.summarizeFile'\n- 'terminal.executeCommand'\n- 'webSearch.search'\n你必须以一个只包含 \"toolName\" 和 \"args\" 键的JSON对象作为响应。",
+              "allowedTools": ["fileSystem.writeFile", "fileSystem.readFile", "fileSystem.listFiles", "fileSystem.summarizeFile", "terminal.executeCommand", "webSearch.search"]
             },
-            "synthesizer": {
-              "type": "string",
-              "description": "用于整合结果的模型。"
+            {
+              "name": "Synthesizer",
+              "model": "",
+              "systemPrompt": "你是一个“整合者”智能体。你的职责是接收用户的原始请求和所有已完成子任务的摘要，然后生成最终的、完整的产物。\n你只应该输出最终的产物本身，不带任何解释、代码块标记或其他文本。",
+              "allowedTools": []
             },
-            "evaluationTeam": {
-              "type": "array",
-              "default": [],
-              "description": "用于评估产出的一组模型名称。",
-              "items": {
-                "type": "string"
-              }
+            {
+              "name": "Evaluator",
+              "model": "",
+              "systemPrompt": "你是一个“评估者”智能体。你的职责是严格评估最终产物是否满足用户的原始请求和所有上下文信息。\n你必须提供一个1到10的分数，并给出具体的改进建议。\n你必须以一个只包含 \"score\" 和 \"suggestions\" (一个字符串数组) 键的JSON对象作为响应。",
+              "allowedTools": []
             },
-            "critiqueAggregator": {
-              "type": "string",
-              "description": "用于总结和整合评估团队反馈的模型。"
+            {
+              "name": "CritiqueAggregator",
+              "model": "",
+              "systemPrompt": "你是一个“评论聚合者”智能体。你的职责是接收来自多个评估者的多个评估（分数和建议），并生成一个单一的、简洁的最终评估。\n你必须以一个只包含 \"score\" (一个数字) 和 \"summary\" (一个字符串) 键的JSON对象作为响应。",
+              "allowedTools": []
             },
-            "codebaseScanner": {
-              "type": "string",
-              "description": "用于扫描和总结代码库中文件内容的模型。建议使用速度快的模型。"
+            {
+              "name": "CodebaseScanner",
+              "model": "",
+              "systemPrompt": "你是一个“代码库扫描员”智能体。你的职责是接收一个代码文件的内容，并用一句话总结它的主要功能。例如，“一个实现快速排序的JS模块”。",
+              "allowedTools": []
             },
-            "reflector": {
-              "type": "string",
-              "description": "用于分析失败并提出修正建议的模型。"
+            {
+              "name": "Reflector",
+              "model": "",
+              "systemPrompt": "你是一个“反思者”智能体。你的工作是诊断另一个智能体执行任务失败的原因，并提出一个具体的、修正后的下一步行动。\n你必须以一个只包含 \"cause\" 和 \"nextStep\" 键的JSON对象作为响应。",
+              "allowedTools": []
             }
+          ],
+          "items": {
+            "type": "object",
+            "title": "角色配置",
+            "properties": {
+              "name": { "type": "string", "description": "角色的唯一名称。" },
+              "model": { "type": "string", "description": "分配给此角色的已定义模型的名称。" },
+              "systemPrompt": { "type": "string", "description": "此角色的系统提示。", "format": "multiline" },
+              "allowedTools": { "type": "array", "description": "允许此角色使用的工具列表。", "items": { "type": "string" } }
+            },
+            "required": ["name", "model", "systemPrompt"]
           }
         }
       }

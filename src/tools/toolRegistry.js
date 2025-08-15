@@ -20,10 +20,17 @@ const toolRegistry = {
  * @param {object} scannerAgent An instance of the CodebaseScannerAgent.
  * @returns {Promise<any>} The result of the tool execution.
  */
-async function executeTool(toolName, args, logger, scannerAgent) {
+async function executeTool(toolName, args, logger, { scannerAgent, workerProfile }) {
     logger.logLine(`\n--- Tool Call ---`);
     logger.logLine(`Tool: ${toolName}`);
     logger.logLine(`Arguments: ${JSON.stringify(args)}`);
+
+    // Security Check: Verify the agent has permission to use the tool.
+    if (!workerProfile.allowedTools.includes(toolName)) {
+        const errorMsg = `Error: Agent role "Worker" is not authorized to use tool "${toolName}".`;
+        logger.logLine(errorMsg);
+        throw new Error(errorMsg);
+    }
 
     const toolFunction = toolRegistry[toolName];
     if (!toolFunction) {
@@ -62,4 +69,4 @@ async function executeTool(toolName, args, logger, scannerAgent) {
     }
 }
 
-module.exports = { executeTool };
+module.exports = { executeTool, toolRegistry };
