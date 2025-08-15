@@ -5,6 +5,7 @@
     let state = {
         models: [],
         roleAssignments: {},
+        plan: [], // Add plan to state
         enableSmartScan: false,
         enableParallelExec: false,
         enableAutoMode: false,
@@ -46,6 +47,9 @@
             }
         });
 
+        // Plan list clicks
+        planListEl.addEventListener('click', handlePlanClick);
+
         // Settings panel buttons
         document.getElementById('add-model-btn').addEventListener('click', () => openModelEditor());
         document.getElementById('cancel-edit-btn').addEventListener('click', () => closeModelEditor());
@@ -63,6 +67,7 @@
                 overallGoalEl.textContent = message.text;
                 break;
             case 'updatePlan':
+                state.plan = message.plan;
                 updatePlan(message.plan);
                 break;
             case 'log':
@@ -70,6 +75,10 @@
                 break;
             case 'showArtifact':
                 finalArtifactEl.textContent = message.artifact;
+                // Check if hljs is available before using it
+                if (typeof hljs !== 'undefined') {
+                    hljs.highlightElement(finalArtifactEl);
+                }
                 break;
             // Settings Tab commands
             case 'receiveSettings':
@@ -88,13 +97,41 @@
     function updatePlan(plan) {
         planListEl.innerHTML = '';
         if (!plan) return;
-        for (const task of plan) {
+        plan.forEach(task => {
             const li = document.createElement('li');
-            const icon = document.createElement('span');
-            icon.className = `status-icon status-${task.status}`;
-            li.appendChild(icon);
-            li.appendChild(document.createTextNode(task.description.split('\n\n')[0]));
+            li.dataset.taskId = task.id;
+            li.className = 'plan-item';
+
+            const summary = document.createElement('div');
+            summary.className = 'plan-item-summary';
+            summary.innerHTML = `<span class="status-icon status-${task.status}"></span> ${task.description.split('\n\n')[0]}`;
+
+            const details = document.createElement('div');
+            details.className = 'plan-item-details';
+            details.style.display = 'none'; // Initially hidden
+
+            let detailsContent = '';
+            if (task.status === 'completed' && task.result) {
+                detailsContent = `<strong>Result:</strong><pre>${task.result}</pre>`;
+            } else if (task.status === 'failed' && task.error) {
+                detailsContent = `<strong>Error:</strong><pre>${task.error}</pre>`;
+            }
+            details.innerHTML = detailsContent;
+
+            li.appendChild(summary);
+            li.appendChild(details);
             planListEl.appendChild(li);
+        });
+    }
+
+    function handlePlanClick(e) {
+        const item = e.target.closest('.plan-item');
+        if (!item) return;
+
+        const details = item.querySelector('.plan-item-details');
+        if (details) {
+            const isVisible = details.style.display === 'block';
+            details.style.display = isVisible ? 'none' : 'block';
         }
     }
 
