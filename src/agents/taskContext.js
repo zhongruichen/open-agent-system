@@ -1,5 +1,5 @@
 /**
- * @typedef {{id: string, description: string, status: 'pending' | 'in_progress' | 'completed' | 'failed', result: string | null, error: string | null}} SubTask
+ * @typedef {{id: number, description: string, dependencies: number[], status: 'pending' | 'in_progress' | 'completed' | 'failed', result: string | null, error: string | null}} SubTask
  * @typedef {{score: number, suggestions: string[]}} Evaluation
  * @typedef {{iteration: number, artifact: string, evaluation: Evaluation, subTasks: SubTask[]}} IterationHistory
  */
@@ -24,12 +24,13 @@ class TaskContext {
 
     /**
      * Sets the plan for the new iteration.
-     * @param {string[]} planDescriptions An array of strings, where each string is a sub-task description.
+     * @param {object[]} planObjects An array of objects from the orchestrator.
      */
-    setNewPlanForIteration(planDescriptions) {
-        this.subTasks = planDescriptions.map((desc, index) => ({
-            id: `task_iter${this.currentIteration}_${index + 1}`,
-            description: desc,
+    setNewPlanForIteration(planObjects) {
+        this.subTasks = planObjects.map(planObj => ({
+            id: planObj.id,
+            description: planObj.description,
+            dependencies: planObj.dependencies || [],
             status: 'pending',
             result: null,
             error: null,
@@ -37,15 +38,36 @@ class TaskContext {
     }
 
     /**
-     * @returns {SubTask | undefined} The next pending sub-task.
+     * Gets all tasks that are currently able to run (i.e., their dependencies are met).
+     * @returns {SubTask[]} An array of runnable sub-tasks.
      */
-    getNextPendingTask() {
-        return this.subTasks.find(task => task.status === 'pending');
+    getRunnableTasks() {
+        const completedTaskIds = new Set(
+            this.subTasks
+                .filter(t => t.status === 'completed')
+                .map(t => t.id)
+        );
+
+        return this.subTasks.filter(task => {
+            if (task.status !== 'pending') {
+                return false;
+            }
+            return task.dependencies.every(depId => completedTaskIds.has(depId));
+        });
     }
 
     /**
+     * Checks if all tasks for the current iteration are finished (either completed or failed).
+     * @returns {boolean}
+     */
+    areAllTasksDone() {
+        return this.subTasks.every(t => t.status === 'completed' || t.status === 'failed');
+    }
+
+
+    /**
      * Updates the status of a sub-task.
-     * @param {string} taskId
+     * @param {number} taskId
      * @param {'in_progress' | 'completed' | 'failed'} status
      * @param {string | null} [resultOrError] The result of the task or an error message.
      */
@@ -56,10 +78,10 @@ class TaskContext {
             if (status === 'completed') {
                 task.result = resultOrError;
                 // Update overall progress summary
-                this.overallProgress += `Completed Task: ${task.description}\nResult: ${resultOrError}\n\n`;
+                this.overallProgress += `Completed Task ${task.id}: ${task.description}\nResult: ${resultOrError}\n\n`;
             } else if (status === 'failed') {
                 task.error = resultOrError;
-                this.overallProgress += `Failed Task: ${task.description}\nError: ${resultOrError}\n\n`;
+                this.overallProgress += `Failed Task ${task.id}: ${task.description}\nError: ${resultOrError}\n\n`;
             }
         }
     }
@@ -92,7 +114,7 @@ class TaskContext {
     getCompletedTasksSummary() {
         return this.subTasks
             .filter(task => task.status === 'completed' && task.result)
-            .map(task => `Sub-task: ${task.description}\nResult:\n${task.result}`)
+            .map(task => `Sub-task ${task.id}: ${task.description}\nResult:\n${task.result}`)
             .join('\n\n---\n\n');
     }
 }

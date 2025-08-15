@@ -70,11 +70,16 @@ class MainPanel {
 
     sendSettingsToWebview() {
         const config = vscode.workspace.getConfiguration('multiAgent');
-        const models = config.get('models', []);
-        const roleAssignments = config.get('roleAssignments', {});
         this.panel.webview.postMessage({
             command: 'receiveSettings',
-            settings: { models, roleAssignments }
+            settings: {
+                models: config.get('models', []),
+                roleAssignments: config.get('roleAssignments', {}),
+                enableSmartScan: config.get('enableSmartScan', false),
+                enableParallelExec: config.get('enableParallelExec', false),
+                enableAutoMode: config.get('enableAutoMode', false),
+                enablePersistence: config.get('enablePersistence', false)
+            }
         });
     }
 
@@ -83,6 +88,10 @@ class MainPanel {
         // Update settings in VS Code configuration
         await config.update('models', settings.models, vscode.ConfigurationTarget.Workspace);
         await config.update('roleAssignments', settings.roleAssignments, vscode.ConfigurationTarget.Workspace);
+        await config.update('enableSmartScan', settings.enableSmartScan, vscode.ConfigurationTarget.Workspace);
+        await config.update('enableParallelExec', settings.enableParallelExec, vscode.ConfigurationTarget.Workspace);
+        await config.update('enableAutoMode', settings.enableAutoMode, vscode.ConfigurationTarget.Workspace);
+        await config.update('enablePersistence', settings.enablePersistence, vscode.ConfigurationTarget.Workspace);
     }
 
     dispose() {

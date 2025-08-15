@@ -4,7 +4,11 @@
     // --- STATE ---
     let state = {
         models: [],
-        roleAssignments: {}
+        roleAssignments: {},
+        enableSmartScan: false,
+        enableParallelExec: false,
+        enableAutoMode: false,
+        enablePersistence: false,
     };
 
     // --- DOM ELEMENTS ---
@@ -20,6 +24,10 @@
     const modelForm = document.getElementById('model-form');
     const editorTitleEl = document.getElementById('editor-title');
     const roleAssignmentsEl = document.getElementById('role-assignments');
+    const smartScanCheckbox = document.getElementById('setting-smart-scan');
+    const parallelExecCheckbox = document.getElementById('setting-parallel-exec');
+    const autoModeCheckbox = document.getElementById('setting-auto-mode');
+    const persistenceCheckbox = document.getElementById('setting-persistence');
 
     // --- INITIALIZATION ---
     document.addEventListener('DOMContentLoaded', () => {
@@ -67,6 +75,10 @@
             case 'receiveSettings':
                 state.models = message.settings.models || [];
                 state.roleAssignments = message.settings.roleAssignments || {};
+                state.enableSmartScan = message.settings.enableSmartScan || false;
+                state.enableParallelExec = message.settings.enableParallelExec || false;
+                state.enableAutoMode = message.settings.enableAutoMode || false;
+                state.enablePersistence = message.settings.enablePersistence || false;
                 renderSettings();
                 break;
         }
@@ -97,6 +109,7 @@
     function renderSettings() {
         renderModelsList();
         renderRoleAssignments();
+        renderAdvancedSettings();
     }
 
     function renderModelsList() {
@@ -148,6 +161,13 @@
         evalTeamItem.innerHTML = `<label for="role-evaluationTeam">evaluationTeam:</label>`;
         evalTeamItem.appendChild(evalSelect);
         roleAssignmentsEl.appendChild(evalTeamItem);
+    }
+
+    function renderAdvancedSettings() {
+        smartScanCheckbox.checked = state.enableSmartScan;
+        parallelExecCheckbox.checked = state.enableParallelExec;
+        autoModeCheckbox.checked = state.enableAutoMode;
+        persistenceCheckbox.checked = state.enablePersistence;
     }
 
     function openModelEditor(model = null, index = -1) {
@@ -217,11 +237,21 @@
         });
         state.roleAssignments = newRoleAssignments;
 
+        // Collect advanced settings
+        state.enableSmartScan = smartScanCheckbox.checked;
+        state.enableParallelExec = parallelExecCheckbox.checked;
+        state.enableAutoMode = autoModeCheckbox.checked;
+        state.enablePersistence = persistenceCheckbox.checked;
+
         vscode.postMessage({
             command: 'saveSettings',
             settings: {
                 models: state.models,
-                roleAssignments: state.roleAssignments
+                roleAssignments: state.roleAssignments,
+                enableSmartScan: state.enableSmartScan,
+                enableParallelExec: state.enableParallelExec,
+                enableAutoMode: state.enableAutoMode,
+                enablePersistence: state.enablePersistence,
             }
         });
 

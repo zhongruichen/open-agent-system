@@ -68,8 +68,28 @@ async function listFiles(relativePath = './') {
     }
 }
 
+/**
+ * Reads and summarizes the content of a file using a scanner agent.
+ * @param {string} relativePath The path relative to the workspace root.
+ * @param {object} scannerAgent An instance of CodebaseScannerAgent.
+ * @returns {Promise<string>} A summary of the file content.
+ */
+async function summarizeFile(relativePath, scannerAgent) {
+    try {
+        const content = await readFile(relativePath);
+        if (content.startsWith('Error reading file:')) {
+            throw new Error(content);
+        }
+        const summary = await scannerAgent.executeTask(content);
+        return `Summary of "${relativePath}":\n${summary}`;
+    } catch (error) {
+        return `Error summarizing file: ${error.message}`;
+    }
+}
+
 module.exports = {
     writeFile,
     readFile,
-    listFiles
+    listFiles,
+    summarizeFile
 };

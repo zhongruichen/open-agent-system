@@ -15,6 +15,8 @@ const SYSTEM_PROMPT = `你是一个“工人”智能体。你的工作是执行
   - args: { "path": "<文件的相对路径>" }
 - 'fileSystem.listFiles': 列出路径下的文件和目录。
   - args: { "path": "<要列出的相对路径>" }
+- 'fileSystem.summarizeFile': 读取并用AI总结一个文件的内容。当项目上下文只提供了文件名列表，而你需要理解文件内容以完成任务时，请使用此工具。
+  - args: { "path": "<文件的相对路径>" }
 - 'terminal.executeCommand': 执行一个shell命令。
   - args: { "command": "<要执行的命令>" }
 - 'webSearch.search': 执行网络搜索以查找信息、回答问题或获取示例。

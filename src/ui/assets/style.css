@@ -143,6 +143,14 @@ h1, h2 {
     border-radius: 2px;
 }
 
+/* Advanced Settings Styles */
+.setting-item {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    padding: 0.5em;
+}
+
 .form-buttons {
     display: flex;
     gap: 1em;
