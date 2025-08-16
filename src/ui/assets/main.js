@@ -44,6 +44,15 @@
         roleEditorFields: document.getElementById('role-editor-fields'),
         saveEditorBtn: document.getElementById('save-editor-btn'),
         cancelEditorBtn: document.getElementById('cancel-editor-btn'),
+        // Health Check
+        healthCheckBtn: document.getElementById('health-check-btn'),
+        healthCheckSpinner: document.getElementById('health-check-spinner'),
+        healthCheckResults: document.getElementById('health-check-results'),
+        // Workspace Status
+        refreshStatusBtn: document.getElementById('refresh-status-btn'),
+        fsStatus: document.getElementById('fs-status'),
+        debuggerStatus: document.getElementById('debugger-status'),
+        gitStatus: document.getElementById('git-status'),
     };
 
     // --- EVENT LISTENERS ---
@@ -58,6 +67,8 @@
         dom.modelsList.addEventListener('click', (e) => handleListClick(e, 'model'));
         dom.rolesList.addEventListener('click', (e) => handleListClick(e, 'role'));
         dom.saveSettingsBtn.addEventListener('click', saveAllSettings);
+        dom.healthCheckBtn.addEventListener('click', runHealthCheck);
+        dom.refreshStatusBtn.addEventListener('click', requestWorkspaceStatus);
         // Modal
         dom.saveEditorBtn.addEventListener('click', handleSaveEditor);
         dom.cancelEditorBtn.addEventListener('click', closeEditor);
@@ -95,6 +106,22 @@
                 state.enableAutoMode = message.settings.enableAutoMode || false;
                 state.enablePersistence = message.settings.enablePersistence || false;
                 renderAllSettings();
+                break;
+            case 'healthCheckResult':
+                dom.healthCheckSpinner.style.display = 'none';
+                dom.healthCheckResults.style.display = 'block';
+                renderHealthCheckResults(message.results);
+                break;
+            case 'updateDebuggerState':
+                state.debuggerState = message.state;
+                // If workspace tab is active, re-render
+                if (document.getElementById('workspace').classList.contains('active')) {
+                    renderWorkspaceStatus(state.workspaceState || {});
+                }
+                break;
+            case 'updateWorkspaceStatus':
+                state.workspaceState = message.status;
+                renderWorkspaceStatus(message.status);
                 break;
         }
     });
@@ -269,6 +296,49 @@
         setTimeout(() => { btn.textContent = originalText; }, 2000);
     }
 
+    function runHealthCheck() {
+        dom.healthCheckSpinner.style.display = 'block';
+        dom.healthCheckResults.style.display = 'none';
+        dom.healthCheckResults.textContent = '';
+        vscode.postMessage({ command: 'runHealthCheck' });
+    }
+
+    function renderHealthCheckResults(results) {
+        const resultsContainer = dom.healthCheckResults;
+        resultsContainer.innerHTML = ''; // Clear previous results
+
+        const header = document.createElement('p');
+        header.textContent = '配置健康检查报告:';
+        resultsContainer.appendChild(header);
+
+        results.errors.forEach(e => {
+            const span = document.createElement('span');
+            span.className = 'health-error';
+            span.textContent = `[错误] ${e}`;
+            resultsContainer.appendChild(span);
+        });
+        results.warnings.forEach(w => {
+            const span = document.createElement('span');
+            span.className = 'health-warning';
+            span.textContent = `[警告] ${w}`;
+            resultsContainer.appendChild(span);
+        });
+        results.success.forEach(s => {
+            const span = document.createElement('span');
+            span.className = 'health-success';
+            span.textContent = `[成功] ${s}`;
+            resultsContainer.appendChild(span);
+        });
+
+        if (results.errors.length === 0 && results.warnings.length === 0) {
+            const allGood = document.createElement('span');
+            allGood.className = 'health-success';
+            allGood.style.marginTop = '1em';
+            allGood.textContent = '所有检查通过，配置看起来很棒！';
+            resultsContainer.appendChild(allGood);
+        }
+    }
+
     // --- Other handlers ---
     function handleTabClick(e) {
         if (e.target.matches('.tab-button')) {
@@ -277,7 +347,55 @@
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             e.target.classList.add('active');
             document.getElementById(tabName).classList.add('active');
+
+            if (tabName === 'workspace') {
+                requestWorkspaceStatus();
+            }
         }
+    }
+
+    function requestWorkspaceStatus() {
+        dom.fsStatus.textContent = '正在刷新...';
+        dom.debuggerStatus.textContent = '正在刷新...';
+        dom.gitStatus.textContent = '正在刷新...';
+        vscode.postMessage({ command: 'getWorkspaceStatus' });
+    }
+
+    function renderWorkspaceStatus(status) {
+        // Render FS Status
+        dom.fsStatus.textContent = status.fileSystem ? status.fileSystem.join('\n') : '未能加载文件列表。';
+
+        // Render Debugger Status
+        let debugContent = '';
+        if (state.debuggerState?.isActive) {
+            debugContent += `<p><strong>状态:</strong> <span class="health-success">激活</span></p>`;
+            debugContent += `<p><strong>会话:</strong> ${state.debuggerState.sessionName}</p>`;
+        } else {
+            debugContent += `<p><strong>状态:</strong> <span class="health-error">未激活</span></p>`;
+        }
+        debugContent += `<strong>断点:</strong>`;
+        if (status.breakpoints && status.breakpoints.length > 0) {
+            debugContent += `<ul>${status.breakpoints.map(bp => `<li>${bp}</li>`).join('')}</ul>`;
+        } else {
+            debugContent += `<p>无</p>`;
+        }
+        dom.debuggerStatus.innerHTML = debugContent;
+
+
+        // Render Git Status
+        let gitContent = '';
+        if (status.git) {
+            gitContent += `<p><strong>当前分支:</strong> ${status.git.branch}</p>`;
+            gitContent += `<strong>文件状态:</strong>`;
+            if (status.git.files && status.git.files.length > 0) {
+                 gitContent += `<pre class="log-box">${status.git.files.join('\n')}</pre>`;
+            } else {
+                gitContent += `<p>工作区纯净</p>`;
+            }
+        } else {
+            gitContent = '<p>未能加载Git状态。</p>';
+        }
+        dom.gitStatus.innerHTML = gitContent;
     }
 
     // (Plan-related functions from previous steps, unchanged)

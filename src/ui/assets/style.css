@@ -195,6 +195,37 @@ h1, h2 {
     border-radius: 2px;
 }
 
+/* Spinner for loading states */
+.spinner {
+    border: 4px solid rgba(var(--vscode-editor-foreground-rgb), 0.3);
+    border-radius: 50%;
+    border-top-color: var(--vscode-button-background);
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+    margin-top: 1em;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Health Check Results */
+#health-check-results span {
+    display: block;
+    padding: 0.1em 0;
+}
+.health-error {
+    color: var(--vscode-errorForeground);
+}
+.health-warning {
+    color: var(--vscode-list-warningForeground);
+}
+.health-success {
+    color: var(--vscode-terminal-ansi-green);
+}
+
 /* Advanced Settings Styles */
 .setting-item {
     display: flex;

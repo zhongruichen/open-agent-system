@@ -13,6 +13,7 @@
 
     <div class="tabs">
         <button class="tab-button active" data-tab="status">任务状态</button>
+        <button class="tab-button" data-tab="workspace">工作区状态</button>
         <button class="tab-button" data-tab="settings">设置</button>
     </div>
 
@@ -45,6 +46,26 @@
             </div>
         </div>
     </div>
+
+    <!-- Workspace Tab Content -->
+    <div id="workspace" class="tab-content">
+        <button id="refresh-status-btn" class="button">刷新状态</button>
+        <div class="container">
+            <div class="section">
+                <h2>文件系统</h2>
+                <div id="fs-status" class="log-box"></div>
+            </div>
+             <div class="section">
+                <h2>调试器</h2>
+                <div id="debugger-status"></div>
+            </div>
+            <div class="section">
+                <h2>Git</h2>
+                <div id="git-status"></div>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Settings Tab Content -->
     <div id="settings" class="tab-content">
@@ -80,6 +101,13 @@
                     <input type="checkbox" id="setting-persistence">
                 </div>
             </div>
+        </div>
+        <div class="container">
+            <h2>配置健康检查</h2>
+            <p>点击按钮检查您的模型和角色配置是否正确。</p>
+            <button id="health-check-btn" class="button">运行检查</button>
+            <div id="health-check-spinner" class="spinner" style="display: none;"></div>
+            <pre id="health-check-results" class="log-box" style="display: none;"></pre>
         </div>
 
         <button id="save-settings-btn" class="button-primary">保存所有设置</button>

@@ -60,6 +60,12 @@ class MainPanel {
                     case 'cancelTask':
                         this.eventEmitter.emit('planCancelled');
                         return;
+                    case 'runHealthCheck':
+                        this.eventEmitter.emit('runHealthCheck');
+                        return;
+                    case 'getWorkspaceStatus':
+                        this.eventEmitter.emit('getWorkspaceStatus');
+                        return;
                 }
             },
             null,

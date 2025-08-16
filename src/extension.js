@@ -14,6 +14,10 @@ const { CodebaseScannerAgent } = require('./agents/codebaseScannerAgent');
 const { ReflectorAgent } = require('./agents/reflectorAgent.js');
 const EventEmitter = require('events');
 const { MainPanel } = require('./ui/mainPanel');
+const { runHealthCheck } = require('./healthCheck');
+const { listFiles } = require('./tools/fileSystem');
+const gitTools = require('./tools/git');
+
 
 // --- Debug State Manager ---
 let activeDebugSession = null;
@@ -166,6 +170,54 @@ function activate(context) {
     }
 
     const taskEventEmitter = new EventEmitter();
+
+    taskEventEmitter.on('runHealthCheck', () => {
+        const config = vscode.workspace.getConfiguration('multiAgent');
+        const results = runHealthCheck(config);
+        MainPanel.update({
+            command: 'healthCheckResult',
+            results: results
+        });
+    });
+
+    taskEventEmitter.on('getWorkspaceStatus', async () => {
+        const status = await getWorkspaceStatus();
+        MainPanel.update({
+            command: 'updateWorkspaceStatus',
+            status: status
+        });
+    });
+
+    async function getWorkspaceStatus() {
+        try {
+            // 1. File System
+            const fileList = await listFiles('.');
+
+            // 2. Debugger
+            const breakpoints = vscode.debug.breakpoints.map(bp => {
+                if (bp instanceof vscode.SourceBreakpoint) {
+                    return `${path.basename(bp.location.uri.fsPath)}:${bp.location.range.start.line + 1}`;
+                }
+                return 'Function Breakpoint';
+            });
+
+            // 3. Git
+            const branch = await gitTools.getCurrentBranch();
+            const gitStatus = await gitTools.getStatus();
+
+            return {
+                fileSystem: fileList,
+                breakpoints: breakpoints,
+                git: {
+                    branch: branch.replace('Current branch is: ', ''),
+                    files: gitStatus,
+                }
+            };
+        } catch (error) {
+            console.error('Error getting workspace status:', error);
+            return { error: error.message };
+        }
+    }
 
     let disposable = vscode.commands.registerCommand('multi-agent-helper.startTask', async () => {
         try {

@@ -16,6 +16,7 @@ const toolRegistry = {
     'git.createBranch': git.createBranch,
     'git.stageFiles': git.stageFiles,
     'git.commit': git.commit,
+    'git.getStatus': git.getStatus,
     'debugger.start': dbg.start,
     'debugger.stop': dbg.stop,
     'debugger.addBreakpoint': dbg.addBreakpoint,
@@ -77,6 +78,8 @@ async function executeTool(toolName, args, logger, { scannerAgent, workerProfile
             result = await toolFunction(args.files);
         } else if (toolName === 'git.commit') {
             result = await toolFunction(args.message);
+        } else if (toolName === 'git.getStatus') {
+            result = await toolFunction();
         } else if (toolName === 'debugger.start') {
             result = await toolFunction(args.configName);
         } else if (toolName === 'debugger.stop' || toolName === 'debugger.next' || toolName === 'debugger.stepIn' || toolName === 'debugger.stepOut' || toolName === 'debugger.continue') {

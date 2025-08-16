@@ -86,9 +86,27 @@ async function commit(message) {
     }
 }
 
+/**
+ * Gets the status of the git repository.
+ * @returns {Promise<string[]>} A list of files with their status.
+ */
+async function getStatus() {
+    try {
+        const statusOutput = await executeCommand('git status --porcelain');
+        if (!statusOutput) {
+            return [];
+        }
+        return statusOutput.split('\n').map(line => line.trim());
+    } catch (error) {
+        // This can happen if it's not a git repository
+        return [`Error getting git status: ${error}`];
+    }
+}
+
 module.exports = {
     getCurrentBranch,
     createBranch,
     stageFiles,
-    commit
+    commit,
+    getStatus
 };
