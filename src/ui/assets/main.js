@@ -12,6 +12,7 @@
         enableParallelExec: false,
         enableAutoMode: false,
         enablePersistence: false,
+        enableLongTermMemory: false,
         // UI state
         editingType: null, // 'model' or 'role'
         editingIndex: -1,
@@ -37,6 +38,7 @@
         parallelExecCheckbox: document.getElementById('setting-parallel-exec'),
         autoModeCheckbox: document.getElementById('setting-auto-mode'),
         persistenceCheckbox: document.getElementById('setting-persistence'),
+        longTermMemoryCheckbox: document.getElementById('setting-long-term-memory'),
         // Modal
         editorModal: document.getElementById('editor-modal'),
         editorTitle: document.getElementById('editor-title'),
@@ -105,6 +107,7 @@
                 state.enableParallelExec = message.settings.enableParallelExec || false;
                 state.enableAutoMode = message.settings.enableAutoMode || false;
                 state.enablePersistence = message.settings.enablePersistence || false;
+                state.enableLongTermMemory = message.settings.enableLongTermMemory || false;
                 renderAllSettings();
                 break;
             case 'healthCheckResult':
@@ -168,6 +171,7 @@
         dom.parallelExecCheckbox.checked = state.enableParallelExec;
         dom.autoModeCheckbox.checked = state.enableAutoMode;
         dom.persistenceCheckbox.checked = state.enablePersistence;
+        dom.longTermMemoryCheckbox.checked = state.enableLongTermMemory;
     }
 
     // --- EDITOR MODAL LOGIC ---
@@ -277,6 +281,7 @@
         state.enableParallelExec = dom.parallelExecCheckbox.checked;
         state.enableAutoMode = dom.autoModeCheckbox.checked;
         state.enablePersistence = dom.persistenceCheckbox.checked;
+        state.enableLongTermMemory = dom.longTermMemoryCheckbox.checked;
 
         vscode.postMessage({
             command: 'saveSettings',
@@ -287,6 +292,7 @@
                 enableParallelExec: state.enableParallelExec,
                 enableAutoMode: state.enableAutoMode,
                 enablePersistence: state.enablePersistence,
+                enableLongTermMemory: state.enableLongTermMemory,
             }
         });
 

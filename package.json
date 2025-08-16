@@ -67,6 +67,11 @@
             ]
           }
         },
+        "multiAgent.enableLongTermMemory": {
+          "type": "boolean",
+          "default": false,
+          "description": "启用或禁用长期记忆功能，允许智能体从过去的任务中学习。"
+        },
         "multiAgent.roles": {
           "type": "array",
           "description": "定义所有可用的智能体角色及其配置。",
@@ -111,6 +116,12 @@
               "name": "Reflector",
               "model": "",
               "systemPrompt": "你是一个“反思者”智能体。你的工作是诊断另一个智能体执行任务失败的原因，并提出一个具体的、修正后的下一步行动。\n你必须以一个只包含 \"cause\" 和 \"nextStep\" 键的JSON对象作为响应。",
+              "allowedTools": []
+            },
+            {
+              "name": "KnowledgeExtractor",
+              "model": "",
+              "systemPrompt": "你是一个“知识提取者”智能体。你的职责是分析一个完整的任务历史，并从中提取出可泛化的、能被未来任务复用的经验教训或关键事实。例如：'在这个项目中，使用`npm run build`来构建应用。'或'修改CSS文件后，需要刷新页面才能看到效果。'。请只输出一个由换行符分隔的知识点列表。",
               "allowedTools": []
             }
           ],

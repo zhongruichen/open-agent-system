@@ -23,6 +23,16 @@ class TaskContext {
     }
 
     /**
+     * Adds retrieved knowledge to the beginning of the project context.
+     * @param {string} knowledge The knowledge string retrieved from the knowledge base.
+     */
+    addRelevantKnowledge(knowledge) {
+        if (knowledge && typeof knowledge === 'string' && knowledge.trim().length > 0) {
+            this.projectContext = `${knowledge}\n\n---\n\n${this.projectContext}`;
+        }
+    }
+
+    /**
      * Sets the plan for the new iteration.
      * @param {object[]} planObjects An array of objects from the orchestrator.
      */

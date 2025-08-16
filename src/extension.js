@@ -12,6 +12,8 @@ const { EvaluatorAgent } = require('./agents/evaluatorAgent');
 const { CritiqueAggregationAgent } = require('./agents/critiqueAggregationAgent');
 const { CodebaseScannerAgent } = require('./agents/codebaseScannerAgent');
 const { ReflectorAgent } = require('./agents/reflectorAgent.js');
+const { KnowledgeExtractorAgent } = require('./agents/knowledgeExtractorAgent.js');
+const knowledgeBase = require('./memory/knowledgeBase.js');
 const EventEmitter = require('events');
 const { MainPanel } = require('./ui/mainPanel');
 const { runHealthCheck } = require('./healthCheck');
@@ -119,6 +121,7 @@ async function migrateSettings(config) {
 
 function activate(context) {
     setupDebugListeners();
+    knowledgeBase.initialize(context);
 
     // Run migration once on activation
     migrateSettings(vscode.workspace.getConfiguration('multiAgent'));
@@ -256,6 +259,16 @@ function activate(context) {
                 }
                 MainPanel.update({ command: 'updateGoal', text: userRequest });
                 taskContext = new TaskContext(userRequest);
+
+                const enableLongTermMemory = config.get('enableLongTermMemory', false);
+                const { getModelForRole, getRoleProfile } = require('./config');
+
+                if (enableLongTermMemory) {
+                    MainPanel.update({ command: 'log', text: '长期记忆已启用，正在查询知识库...' });
+                    const relevantKnowledge = await knowledgeBase.queryKnowledge(userRequest, getModelForRole('KnowledgeExtractor'));
+                    taskContext.addRelevantKnowledge(relevantKnowledge);
+                    MainPanel.update({ command: 'log', text: `知识库查询完毕。` });
+                }
 
                 const enableSmartScan = config.get('enableSmartScan', false);
                 const { getModelForRole, getRoleProfile } = require('./config');
@@ -468,6 +481,28 @@ function activate(context) {
         const report = generateReport(taskContext);
         const reportDocument = await vscode.workspace.openTextDocument({ content: report, language: 'markdown' });
         await vscode.window.showTextDocument(reportDocument);
+
+        // Post-task reflection and knowledge extraction
+        if (config.get('enableLongTermMemory', false)) {
+            MainPanel.update({ command: 'log', text: '任务完成，开始提取知识...' });
+            try {
+                const extractorProfile = getRoleProfile('KnowledgeExtractor');
+                const knowledgeExtractor = new KnowledgeExtractorAgent(getModelForRole('KnowledgeExtractor'), extractorProfile.systemPrompt);
+                const newKnowledge = await knowledgeExtractor.executeTask(taskContext);
+
+                if (newKnowledge && newKnowledge.length > 0) {
+                    for (const entry of newKnowledge) {
+                        await knowledgeBase.addKnowledge(entry);
+                    }
+                    MainPanel.update({ command: 'log', text: `已成功提取并保存 ${newKnowledge.length} 条新知识。` });
+                } else {
+                    MainPanel.update({ command: 'log', text: '未提取到新的可泛化知识。' });
+                }
+            } catch (e) {
+                console.error('Failed to extract or save knowledge:', e);
+                MainPanel.update({ command: 'log', text: `知识提取失败: ${e.message}` });
+            }
+        }
     }
     context.subscriptions.push(disposable);
 }
