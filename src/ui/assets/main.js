@@ -13,6 +13,7 @@
         enableAutoMode: false,
         enablePersistence: false,
         enableLongTermMemory: false,
+        enableAgentCollaboration: false,
         // UI state
         editingType: null, // 'model' or 'role'
         editingIndex: -1,
@@ -39,6 +40,7 @@
         autoModeCheckbox: document.getElementById('setting-auto-mode'),
         persistenceCheckbox: document.getElementById('setting-persistence'),
         longTermMemoryCheckbox: document.getElementById('setting-long-term-memory'),
+        agentCollaborationCheckbox: document.getElementById('setting-agent-collaboration'),
         // Modal
         editorModal: document.getElementById('editor-modal'),
         editorTitle: document.getElementById('editor-title'),
@@ -108,6 +110,7 @@
                 state.enableAutoMode = message.settings.enableAutoMode || false;
                 state.enablePersistence = message.settings.enablePersistence || false;
                 state.enableLongTermMemory = message.settings.enableLongTermMemory || false;
+                state.enableAgentCollaboration = message.settings.enableAgentCollaboration || false;
                 renderAllSettings();
                 break;
             case 'healthCheckResult':
@@ -172,6 +175,7 @@
         dom.autoModeCheckbox.checked = state.enableAutoMode;
         dom.persistenceCheckbox.checked = state.enablePersistence;
         dom.longTermMemoryCheckbox.checked = state.enableLongTermMemory;
+        dom.agentCollaborationCheckbox.checked = state.enableAgentCollaboration;
     }
 
     // --- EDITOR MODAL LOGIC ---
@@ -282,6 +286,7 @@
         state.enableAutoMode = dom.autoModeCheckbox.checked;
         state.enablePersistence = dom.persistenceCheckbox.checked;
         state.enableLongTermMemory = dom.longTermMemoryCheckbox.checked;
+        state.enableAgentCollaboration = dom.agentCollaborationCheckbox.checked;
 
         vscode.postMessage({
             command: 'saveSettings',
@@ -293,6 +298,7 @@
                 enableAutoMode: state.enableAutoMode,
                 enablePersistence: state.enablePersistence,
                 enableLongTermMemory: state.enableLongTermMemory,
+                enableAgentCollaboration: state.enableAgentCollaboration,
             }
         });
 

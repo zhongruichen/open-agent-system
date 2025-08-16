@@ -19,9 +19,9 @@ const SYSTEM_PROMPT = `你是一位专业的代码评审员和质量保证专家
 }`;
 
 class EvaluatorAgent extends BaseAgent {
-    constructor(modelConfig, systemPrompt) {
+    constructor(modelConfig, systemPrompt, id, messageBus) {
         const defaultPrompt = SYSTEM_PROMPT;
-        super(modelConfig, systemPrompt || defaultPrompt);
+        super(modelConfig, systemPrompt || defaultPrompt, id, messageBus);
     }
 
     /**

@@ -36,9 +36,9 @@ const SYSTEM_PROMPT = `你是一位专业的软件开发项目经理。你的职
 }`;
 
 class OrchestratorAgent extends BaseAgent {
-    constructor(modelConfig, systemPrompt) {
+    constructor(modelConfig, systemPrompt, id, messageBus) {
         const defaultPrompt = SYSTEM_PROMPT;
-        super(modelConfig, systemPrompt || defaultPrompt);
+        super(modelConfig, systemPrompt || defaultPrompt, id, messageBus);
     }
 
     /**

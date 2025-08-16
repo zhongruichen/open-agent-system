@@ -72,6 +72,11 @@
           "default": false,
           "description": "启用或禁用长期记忆功能，允许智能体从过去的任务中学习。"
         },
+        "multiAgent.enableAgentCollaboration": {
+          "type": "boolean",
+          "default": false,
+          "description": "启用或禁用智能体协作功能（实验性），例如直接通信和动态任务分配。"
+        },
         "multiAgent.roles": {
           "type": "array",
           "description": "定义所有可用的智能体角色及其配置。",

@@ -14,9 +14,9 @@ const SYSTEM_PROMPT = `你是一位“首席评审员”。你收到了一系列
 不要添加任何解释。只输出JSON对象。`;
 
 class CritiqueAggregationAgent extends BaseAgent {
-    constructor(modelConfig, systemPrompt) {
+    constructor(modelConfig, systemPrompt, id, messageBus) {
         const defaultPrompt = SYSTEM_PROMPT;
-        super(modelConfig, systemPrompt || defaultPrompt);
+        super(modelConfig, systemPrompt || defaultPrompt, id, messageBus);
     }
 
     /**

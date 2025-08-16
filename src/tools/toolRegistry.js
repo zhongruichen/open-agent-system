@@ -3,6 +3,7 @@ const { executeCommand } = require('./terminal.js');
 const { search } = require('./webSearch.js');
 const git = require('./git.js');
 const dbg = require('./debugger.js');
+const agent = require('./agent.js');
 
 // The registry maps tool names to their implementation.
 const toolRegistry = {
@@ -26,6 +27,7 @@ const toolRegistry = {
     'debugger.stepOut': dbg.stepOut,
     'debugger.continue': dbg.continue,
     'debugger.evaluate': dbg.evaluate,
+    'agent.sendMessage': agent.sendMessage,
 };
 
 /**
@@ -33,10 +35,11 @@ const toolRegistry = {
  * @param {string} toolName The name of the tool to execute.
  * @param {object} args The arguments for the tool.
  * @param {object} logger A logger object with a logLine method.
- * @param {object} scannerAgent An instance of the CodebaseScannerAgent.
+ * @param {object} toolContext An object containing contextual tools and instances.
  * @returns {Promise<any>} The result of the tool execution.
  */
-async function executeTool(toolName, args, logger, { scannerAgent, workerProfile }) {
+async function executeTool(toolName, args, logger, toolContext) {
+    const { scannerAgent, workerProfile, agentMessageBus } = toolContext;
     logger.logLine(`\n--- Tool Call ---`);
     logger.logLine(`Tool: ${toolName}`);
     logger.logLine(`Arguments: ${JSON.stringify(args)}`);
@@ -88,6 +91,8 @@ async function executeTool(toolName, args, logger, { scannerAgent, workerProfile
             result = await toolFunction(args.file, args.line);
         } else if (toolName === 'debugger.evaluate') {
             result = await toolFunction(args.expression);
+        } else if (toolName === 'agent.sendMessage') {
+            result = await toolFunction(args.recipientId, args.messageContent, agentMessageBus);
         } else {
             throw new Error(`Argument handling for tool "${toolName}" is not implemented.`);
         }

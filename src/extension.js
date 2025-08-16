@@ -20,6 +20,7 @@ const { runHealthCheck } = require('./healthCheck');
 const { listFiles } = require('./tools/fileSystem');
 const gitTools = require('./tools/git');
 
+const agentMessageBus = new EventEmitter();
 
 // --- Debug State Manager ---
 let activeDebugSession = null;
@@ -324,13 +325,18 @@ function activate(context) {
         const reflectorProfile = getRoleProfile('Reflector');
         const evaluatorProfile = getRoleProfile('Evaluator');
 
-        const orchestrator = new OrchestratorAgent(getModelForRole('Orchestrator'), orchestratorProfile.systemPrompt);
-        const worker = new WorkerAgent(getModelForRole('Worker'), workerProfile.systemPrompt);
-        const synthesizer = new SynthesizerAgent(getModelForRole('Synthesizer'), synthesizerProfile.systemPrompt);
-        const critiqueAggregator = new CritiqueAggregationAgent(getModelForRole('CritiqueAggregator'), critiqueAggregatorProfile.systemPrompt);
-        const scannerAgent = new CodebaseScannerAgent(getModelForRole('CodebaseScanner'), scannerProfile.systemPrompt);
-        const reflectorAgent = reflectorProfile ? new ReflectorAgent(getModelForRole('Reflector'), reflectorProfile.systemPrompt) : null;
-        const evaluationTeamConfigs = getModelsForTeam('Evaluator'); // Special handling for teams
+        const orchestrator = new OrchestratorAgent(getModelForRole('Orchestrator'), orchestratorProfile.systemPrompt, 'Orchestrator', agentMessageBus);
+        let workerSystemPrompt = workerProfile.systemPrompt;
+        if (config.get('enableAgentCollaboration', false)) {
+            workerSystemPrompt += "\n- 'agent.sendMessage': 向另一个智能体发送消息。\n  - args: { \"recipientId\": \"<接收方智能体的ID>\", \"messageContent\": \"<消息内容>\" }";
+        }
+        const worker = new WorkerAgent(getModelForRole('Worker'), workerSystemPrompt, 'Worker', agentMessageBus);
+        const synthesizer = new SynthesizerAgent(getModelForRole('Synthesizer'), synthesizerProfile.systemPrompt, 'Synthesizer', agentMessageBus);
+        const critiqueAggregator = new CritiqueAggregationAgent(getModelForRole('CritiqueAggregator'), critiqueAggregatorProfile.systemPrompt, 'CritiqueAggregator', agentMessageBus);
+        const scannerAgent = new CodebaseScannerAgent(getModelForRole('CodebaseScanner'), scannerProfile.systemPrompt, 'CodebaseScanner', agentMessageBus);
+        const reflectorAgent = reflectorProfile ? new ReflectorAgent(getModelForRole('Reflector'), reflectorProfile.systemPrompt, 'Reflector', agentMessageBus) : null;
+        // Note: Evaluation team and Knowledge Extractor are handled differently or created on-demand
+        const evaluationTeamConfigs = getModelsForTeam('Evaluator');
 
 
         // This function encapsulates the logic for executing a single task.
@@ -353,7 +359,7 @@ function activate(context) {
                         );
                         if (userApproval !== "批准") throw new Error("用户拒绝了终端命令的执行。");
                     }
-                    const toolContext = { scannerAgent, workerProfile };
+                    const toolContext = { scannerAgent, workerProfile, agentMessageBus };
                     const toolResult = await executeTool(workerResult.toolName, workerResult.args, logger, toolContext);
                     taskContext.updateTaskStatus(subTask.id, 'completed', toolResult);
                     MainPanel.update({ command: 'log', text: `任务 ${subTask.id} 成功完成。` });
@@ -442,8 +448,9 @@ function activate(context) {
             MainPanel.update({ command: 'highlightArtifact' });
 
 
-            const evaluationPromises = evaluationTeamConfigs.map(config => {
-                const evaluator = new EvaluatorAgent(config);
+            const evaluationPromises = evaluationTeamConfigs.map((config, index) => {
+                const evaluatorId = `Evaluator_${index + 1}`;
+                const evaluator = new EvaluatorAgent(config, evaluatorProfile.systemPrompt, evaluatorId, agentMessageBus);
                 return evaluator.executeTask(artifact, taskContext);
             });
             const evaluations = await Promise.all(evaluationPromises);
