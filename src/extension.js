@@ -326,6 +326,32 @@ function activate(context) {
         const evaluatorProfile = getRoleProfile('Evaluator');
 
         const orchestrator = new OrchestratorAgent(getModelForRole('Orchestrator'), orchestratorProfile.systemPrompt, 'Orchestrator', agentMessageBus);
+
+        // --- Dynamic Task Delegation Listener ---
+        agentMessageBus.on('createSubTask', (task) => {
+            if (!taskContext) return; // Should not happen in a running task
+
+            const newTaskId = taskContext.subTasks.length > 0 ? Math.max(...taskContext.subTasks.map(t => t.id)) + 1 : 1;
+
+            // For now, let's find the currently "in_progress" task and make the new task dependent on it.
+            // A more robust solution would be to have the sender agent specify dependencies.
+            const currentTask = taskContext.subTasks.find(t => t.status === 'in_progress');
+            const dependencies = currentTask ? [currentTask.id] : [];
+
+            const newSubTask = {
+                id: newTaskId,
+                description: `(委派自 ${task.recipientRole}): ${task.taskDescription}`,
+                dependencies: dependencies,
+                status: 'pending',
+                result: null,
+                error: null,
+            };
+            taskContext.subTasks.push(newSubTask);
+            MainPanel.update({ command: 'log', text: `动态创建新任务 #${newTaskId} 并已添加到计划中。` });
+            MainPanel.update({ command: 'updatePlan', plan: taskContext.subTasks });
+        });
+        // --- End Listener ---
+
         let workerSystemPrompt = workerProfile.systemPrompt;
         if (config.get('enableAgentCollaboration', false)) {
             workerSystemPrompt += "\n- 'agent.sendMessage': 向另一个智能体发送消息。\n  - args: { \"recipientId\": \"<接收方智能体的ID>\", \"messageContent\": \"<消息内容>\" }";

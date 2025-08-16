@@ -28,6 +28,7 @@ const toolRegistry = {
     'debugger.continue': dbg.continue,
     'debugger.evaluate': dbg.evaluate,
     'agent.sendMessage': agent.sendMessage,
+    'agent.createSubTask': agent.createSubTask,
 };
 
 /**
@@ -93,6 +94,8 @@ async function executeTool(toolName, args, logger, toolContext) {
             result = await toolFunction(args.expression);
         } else if (toolName === 'agent.sendMessage') {
             result = await toolFunction(args.recipientId, args.messageContent, agentMessageBus);
+        } else if (toolName === 'agent.createSubTask') {
+            result = await toolFunction(args.recipientRole, args.taskDescription, agentMessageBus);
         } else {
             throw new Error(`Argument handling for tool "${toolName}" is not implemented.`);
         }

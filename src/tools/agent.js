@@ -19,6 +19,22 @@ async function sendMessage(recipientId, messageContent, agentMessageBus) {
     return { success: true, message: `Message sent to agent "${recipientId}".` };
 }
 
+async function createSubTask(recipientRole, taskDescription, agentMessageBus) {
+    if (!agentMessageBus) {
+        return { success: false, message: "Internal Error: Message bus is not available." };
+    }
+
+    const task = {
+        recipientRole,
+        taskDescription,
+    };
+
+    agentMessageBus.emit('createSubTask', task);
+
+    return { success: true, message: `Sub-task creation request sent for role "${recipientRole}".` };
+}
+
 module.exports = {
     sendMessage,
+    createSubTask,
 };

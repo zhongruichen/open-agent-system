@@ -29,6 +29,8 @@ const SYSTEM_PROMPT = `你是一个“工人”智能体。你的工作是执行
   - args: { "files": ["<文件路径1>", "<文件路径2>"] }
 - 'git.commit': 提交暂存的文件。
   - args: { "message": "<提交信息>" }
+- 'agent.createSubTask': 创建一个委派给另一个智能体的新子任务。当一项任务过于复杂或超出你的范围时，例如需要专门的分析或代码生成，请使用此工具。
+  - args: { "taskDescription": "<对新子任务的清晰、可操作的描述>", "recipientRole": "<接收任务的智能体的角色 (例如, 'Worker', 'Synthesizer')>" }
 
 不要添加任何解释。只输出JSON对象。
 
