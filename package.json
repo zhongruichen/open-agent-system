@@ -164,6 +164,7 @@
     "esbuild": "^0.20.0",
     "eslint": "^8.57.0",
     "@vscode/vsce": "^2.27.0",
-    "copyfiles": "^2.4.1"
+    "copyfiles": "^2.4.1",
+    "globals": "^15.0.0"
   }
 }

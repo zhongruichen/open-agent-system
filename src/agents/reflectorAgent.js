@@ -18,7 +18,7 @@ const SYSTEM_PROMPT = `你是一个“反思者”智能体。你的工作是诊
 另一个例子，对于失败的任务“运行命令 'git comit -m \"Initial commit\"'”和错误“'comit' is not a git command”，一个好的响应是：
 {
   "cause": "Git命令 'comit' 拼写错误。",
-  "nextStep": "运行命令 'git commit -m \"Initial commit\"'"
+  "nextStep": "运行命令 'git commit -m "Initial commit"'"
 }
 
 不要添加任何额外的解释。只输出JSON对象。`;

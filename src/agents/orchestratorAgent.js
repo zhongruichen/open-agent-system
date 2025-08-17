@@ -24,7 +24,7 @@ const SYSTEM_PROMPT = `你是一位专业的软件开发项目经理。你的职
   "plan": [
     {
       "id": 1,
-      "description": "创建一个名为 'main.py' 的文件，内容为 'print(\"Hello, World!\")'",
+      "description": "创建一个名为 'main.py' 的文件，内容为 'print("Hello, World!")'",
       "dependencies": []
     },
     {

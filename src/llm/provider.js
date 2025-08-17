@@ -1,4 +1,5 @@
 const https = require('https');
+const { URL } = require('url');
 
 /**
  * A provider class for making chat completion requests to an OpenAI-compatible API.

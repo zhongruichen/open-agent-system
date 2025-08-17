@@ -9,7 +9,7 @@ class MainPanel {
     static currentPanel = undefined;
     static viewType = 'multiAgentStatus';
 
-    static createOrShow(extensionPath, eventEmitter) {
+    static createOrShow(context, eventEmitter) {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
@@ -25,11 +25,14 @@ class MainPanel {
             column || vscode.ViewColumn.Two,
             {
                 enableScripts: true,
-                localResourceRoots: [vscode.Uri.file(path.join(extensionPath, 'dist', 'assets'))]
+                localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, 'dist', 'assets'))]
             }
         );
 
-        MainPanel.currentPanel = new MainPanel(panel, extensionPath, eventEmitter);
+        // Add the panel to the extension's subscriptions for automatic disposal
+        context.subscriptions.push(panel);
+
+        MainPanel.currentPanel = new MainPanel(panel, context.extensionPath, eventEmitter);
     }
 
     static update(message) {
@@ -42,10 +45,11 @@ class MainPanel {
         this.panel = panel;
         this.extensionPath = extensionPath;
         this.eventEmitter = eventEmitter;
+        this.disposables = [];
 
         this.panel.webview.html = this._getHtmlForWebview();
 
-        this.panel.webview.onDidReceiveMessage(
+        this.disposables.push(this.panel.webview.onDidReceiveMessage(
             async message => {
                 switch (message.command) {
                     case 'getSettings':
@@ -68,11 +72,10 @@ class MainPanel {
                         return;
                 }
             },
-            null,
-            []
-        );
+            null
+        ));
 
-        this.panel.onDidDispose(() => this.dispose(), null, []);
+        this.disposables.push(this.panel.onDidDispose(() => this.dispose(), null));
     }
 
     sendSettingsToWebview() {
@@ -106,7 +109,16 @@ class MainPanel {
         // Also emit a cancel event if the panel is closed during review
         this.eventEmitter.emit('planCancelled');
         MainPanel.currentPanel = undefined;
+
+        // Clean up our resources
         this.panel.dispose();
+
+        while (this.disposables.length) {
+            const x = this.disposables.pop();
+            if (x) {
+                x.dispose();
+            }
+        }
     }
 
     _getHtmlForWebview() {
