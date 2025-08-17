@@ -12,6 +12,7 @@ const { EvaluatorAgent } = require('./agents/evaluatorAgent');
 const { CritiqueAggregationAgent } = require('./agents/critiqueAggregationAgent');
 const { CodebaseScannerAgent } = require('./agents/codebaseScannerAgent');
 const { ReflectorAgent } = require('./agents/reflectorAgent.js');
+const { ReviewerAgent } = require('./agents/reviewerAgent.js');
 const { KnowledgeExtractorAgent } = require('./agents/knowledgeExtractorAgent.js');
 const knowledgeBase = require('./memory/knowledgeBase.js');
 const EventEmitter = require('events');
@@ -323,6 +324,7 @@ function activate(context) {
         const critiqueAggregatorProfile = getRoleProfile('CritiqueAggregator');
         const scannerProfile = getRoleProfile('CodebaseScanner');
         const reflectorProfile = getRoleProfile('Reflector');
+        const reviewerProfile = getRoleProfile('Reviewer');
         const evaluatorProfile = getRoleProfile('Evaluator');
 
         const orchestrator = new OrchestratorAgent(getModelForRole('Orchestrator'), orchestratorProfile.systemPrompt, 'Orchestrator', agentMessageBus);
@@ -333,8 +335,6 @@ function activate(context) {
 
             const newTaskId = taskContext.subTasks.length > 0 ? Math.max(...taskContext.subTasks.map(t => t.id)) + 1 : 1;
 
-            // For now, let's find the currently "in_progress" task and make the new task dependent on it.
-            // A more robust solution would be to have the sender agent specify dependencies.
             const currentTask = taskContext.subTasks.find(t => t.status === 'in_progress');
             const dependencies = currentTask ? [currentTask.id] : [];
 
@@ -350,7 +350,44 @@ function activate(context) {
             MainPanel.update({ command: 'log', text: `动态创建新任务 #${newTaskId} 并已添加到计划中。` });
             MainPanel.update({ command: 'updatePlan', plan: taskContext.subTasks });
         });
-        // --- End Listener ---
+
+        // --- Agent Communication Listener ---
+        const reviewerAgent = reviewerProfile ? new ReviewerAgent(getModelForRole('Reviewer'), reviewerProfile.systemPrompt, 'Reviewer', agentMessageBus) : null;
+
+        agentMessageBus.on('message', async (message) => {
+            if (!taskContext || !message.recipientId) return;
+
+            // Handle messages sent TO the reviewer
+            if (message.recipientId === 'Reviewer' && reviewerAgent) {
+                MainPanel.update({ command: 'log', text: `Reviewer 正在审查来自 ${message.senderId} 的操作...` });
+                try {
+                    const review = await reviewerAgent.executeTask(message.messageContent);
+                    // Send feedback back to the original sender
+                    agentMessageBus.emit('message', {
+                        senderId: 'Reviewer',
+                        recipientId: message.senderId,
+                        isReview: true,
+                        review: review,
+                        originalSubTaskId: message.subTaskId, // Pass the ID back
+                    });
+                } catch (e) {
+                     MainPanel.update({ command: 'log', text: `Reviewer Agent 失败: ${e.message}` });
+                }
+            }
+
+            // Handle messages sent FROM the reviewer (i.e., the review itself)
+            if (message.senderId === 'Reviewer' && message.isReview) {
+                 const taskToUpdate = taskContext.subTasks.find(t => t.id === message.originalSubTaskId);
+                 if (taskToUpdate && taskToUpdate.status === 'waiting_for_review') {
+                     MainPanel.update({ command: 'log', text: `收到对任务 #${taskToUpdate.id} 的审查反馈。` });
+                     const { approved, feedback } = message.review;
+                     taskToUpdate.description += `\n\n--- 审查反馈 ---\n状态: ${approved ? '已批准' : '需要修改'}\n反馈: ${feedback}`;
+                     taskToUpdate.status = 'pending'; // Set it back to pending to be re-evaluated
+                     MainPanel.update({ command: 'updatePlan', plan: taskContext.subTasks });
+                 }
+            }
+        });
+        // --- End Listeners ---
 
         let workerSystemPrompt = workerProfile.systemPrompt;
         if (config.get('enableAgentCollaboration', false)) {
@@ -385,8 +422,17 @@ function activate(context) {
                         );
                         if (userApproval !== "批准") throw new Error("用户拒绝了终端命令的执行。");
                     }
-                    const toolContext = { scannerAgent, workerProfile, agentMessageBus };
+                    const toolContext = { scannerAgent, workerProfile, agentMessageBus, senderId: worker.id, subTaskId: subTask.id };
                     const toolResult = await executeTool(workerResult.toolName, workerResult.args, logger, toolContext);
+
+                    // Handle the self-correction workflow
+                    if (workerResult.toolName === 'agent.sendMessage' && workerResult.args.recipientId === 'Reviewer') {
+                        taskContext.updateTaskStatus(subTask.id, 'waiting_for_review');
+                        MainPanel.update({ command: 'log', text: `任务 ${subTask.id} 已发送审查，正在等待反馈...` });
+                        MainPanel.update({ command: 'updatePlan', plan: taskContext.subTasks });
+                        return; // Exit executeSingleTask, do not mark as complete or failed
+                    }
+
                     taskContext.updateTaskStatus(subTask.id, 'completed', toolResult);
                     MainPanel.update({ command: 'log', text: `任务 ${subTask.id} 成功完成。` });
                     lastError = '';
@@ -445,7 +491,16 @@ function activate(context) {
                     while (!taskContext.areAllTasksDone()) {
                         const runnableTasks = taskContext.getRunnableTasks();
                         if (runnableTasks.length === 0) {
-                            MainPanel.update({ command: 'log', text: '错误：检测到任务依赖死锁。' });
+                            // If there are no runnable tasks, check if we are just waiting for reviews.
+                            const isWaitingForReview = taskContext.subTasks.some(t => t.status === 'waiting_for_review');
+                            if (isWaitingForReview) {
+                                MainPanel.update({ command: 'log', text: '正在等待审查反馈...' });
+                                // Wait for a short period before checking again to avoid a busy loop.
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                continue;
+                            }
+
+                            MainPanel.update({ command: 'log', text: '错误：检测到任务依赖死锁或所有任务都已完成/失败。' });
                             break;
                         }
                         await Promise.all(runnableTasks.map(executeSingleTask));
@@ -457,7 +512,16 @@ function activate(context) {
                     while (!taskContext.areAllTasksDone()) {
                          const runnableTasks = taskContext.getRunnableTasks();
                          if (runnableTasks.length === 0) {
-                            MainPanel.update({ command: 'log', text: '错误：检测到任务依赖死锁。' });
+                            // If there are no runnable tasks, check if we are just waiting for reviews.
+                            const isWaitingForReview = taskContext.subTasks.some(t => t.status === 'waiting_for_review');
+                            if (isWaitingForReview) {
+                                MainPanel.update({ command: 'log', text: '正在等待审查反馈...' });
+                                // Wait for a short period before checking again to avoid a busy loop.
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                continue;
+                            }
+
+                            MainPanel.update({ command: 'log', text: '错误：检测到任务依赖死锁或所有任务都已完成/失败。' });
                             break;
                         }
                         await executeSingleTask(runnableTasks[0]);

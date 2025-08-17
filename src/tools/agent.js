@@ -1,37 +1,41 @@
-/**
- * Sends a message to another agent via the provided message bus.
- * @param {string} recipientId The ID of the agent to receive the message.
- * @param {any} messageContent The content of the message.
- * @param {import('events').EventEmitter} agentMessageBus The message bus instance.
- * @returns {Promise<{success: boolean, message: string}>} A confirmation that the message was sent.
- */
-async function sendMessage(recipientId, messageContent, agentMessageBus) {
+async function sendMessage(args, context) {
+    const { recipientId, messageContent } = args;
+    const { agentMessageBus, senderId, subTaskId } = context;
+
     if (!agentMessageBus) {
-        return { success: false, message: "Internal Error: Message bus is not available." };
+        throw new Error("Internal Error: Message bus is not available.");
+    }
+    if (!recipientId || !messageContent) {
+        throw new Error("sendMessage requires 'recipientId' and 'messageContent' arguments.");
     }
 
-    const message = {
-        content: messageContent,
-    };
+    agentMessageBus.emit('message', {
+        senderId: senderId || 'UnknownAgent',
+        recipientId: recipientId,
+        messageContent: messageContent,
+        subTaskId: subTaskId,
+    });
 
-    agentMessageBus.emit(recipientId, message);
-
-    return { success: true, message: `Message sent to agent "${recipientId}".` };
+    return `Message sent to agent "${recipientId}".`;
 }
 
-async function createSubTask(recipientRole, taskDescription, agentMessageBus) {
+async function createSubTask(args, context) {
+    const { recipientRole, taskDescription } = args;
+    const { agentMessageBus } = context;
+
     if (!agentMessageBus) {
-        return { success: false, message: "Internal Error: Message bus is not available." };
+        throw new Error("Internal Error: Message bus is not available.");
+    }
+    if (!recipientRole || !taskDescription) {
+        throw new Error("createSubTask requires 'recipientRole' and 'taskDescription' arguments.");
     }
 
-    const task = {
+    agentMessageBus.emit('createSubTask', {
         recipientRole,
         taskDescription,
-    };
+    });
 
-    agentMessageBus.emit('createSubTask', task);
-
-    return { success: true, message: `Sub-task creation request sent for role "${recipientRole}".` };
+    return `Sub-task creation request sent for role "${recipientRole}".`;
 }
 
 module.exports = {

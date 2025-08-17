@@ -93,7 +93,7 @@ async function executeTool(toolName, args, logger, toolContext) {
         } else if (toolName === 'debugger.evaluate') {
             result = await toolFunction(args.expression);
         } else if (toolName === 'agent.sendMessage') {
-            result = await toolFunction(args.recipientId, args.messageContent, agentMessageBus);
+            result = await toolFunction(args, toolContext);
         } else if (toolName === 'agent.createSubTask') {
             result = await toolFunction(args.recipientRole, args.taskDescription, agentMessageBus);
         } else {
