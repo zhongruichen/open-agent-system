@@ -20,7 +20,18 @@
 
 插件的主要工作流程是一个迭代式的“规划-执行-评估”循环，旨在通过不断的反馈来逐步求精，直至达到完美的结果。
 
-*\[此处插入一个展示“规划-执行-评估”主循环的流程图]*
+```mermaid
+graph TD
+    A[Start: User provides goal] --> B{Orchestrator: Create Plan};
+    B --> C{User: Review/Approve Plan};
+    C --> D[Execute All Tasks in Plan];
+    D -- All tasks done --> E{Synthesizer: Create Artifact};
+    E --> F{Evaluator Team: Review Artifact};
+    F --> G{Score = 10?};
+    G -- Yes --> H[End: Task Complete];
+    G -- No --> I{Orchestrator: Analyze feedback and create new plan};
+    I --> D;
+```
 
 1.  **规划 (Plan)**: 用户提供一个总体目标后，**项目经理 (Orchestrator)** 会进行分析，并将其分解为一系列具体的、可执行的子任务计划。
 2.  **执行 (Execute)**: **工人 (Worker)** 智能体按照计划，使用文件系统、终端、Git、调试器等工具来逐一完成子任务。
@@ -31,7 +42,20 @@
 
 为了提高效率和准确性，智能体之间还存在更小型的、即时的协作循环。
 
-*\[此处插入一个展示“智能体协作审查”流程的流程图]*
+```mermaid
+sequenceDiagram
+    participant Worker as "工人 (Worker)"
+    participant Reviewer as "审查者 (Reviewer)"
+
+    Worker->>Worker: 构思一个复杂的操作 (例如, 代码)
+    Worker->>Reviewer: 请求审查 (发送代码)
+    note right of Worker: 任务暂停，等待反馈
+    Reviewer->>Reviewer: 分析代码/计划
+    Reviewer-->>Worker: 提供反馈 (批准/拒绝 + 评论)
+    note left of Reviewer: 任务恢复
+    Worker->>Worker: 根据反馈调整计划
+    Worker->>Worker: 执行最终的、改进后的操作
+```
 
 - **失败-反思循环**: 当一个**工人**在执行任务时出错（例如，命令失败），**反思者 (Reflector)** 会被激活。它会分析错误信息，找出根本原因，并为工人提供一个修正后的、更可能成功的下一步指令。
 - **预执行审查循环**: 当一个**工人**将要执行一个复杂或关键的操作时（例如，编写一大段代码），它可以选择先不执行，而是将它的计划发送给**审查者 (Reviewer)**。审查者会像人类代码审查一样提供反馈，工人会根据这些反馈调整其计划，然后再执行，从而在早期预防错误。
